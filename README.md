@@ -17,5 +17,7 @@ Run from anywhere; it finds `..\game_files` relative to the exe, or set RECOMP_G
 
 `patches/*.patch` are changes to the xboxrecomp submodule that are not upstream yet (run
 `./apply_patches.sh` after a fresh submodule checkout; `FROM=lift ./relift.sh` after changing HLE exports).
-`xboxrecomp-fp-vertex-arrays.patch` makes the D3D8 shadow renderer read the NV2A vertex arrays out of the
+`xboxrecomp-fp-changes.patch` makes the D3D8 shadow renderer read the NV2A vertex arrays out of the
 push buffer when the title sets them itself (Future Perfect does), which is what makes its 3D geometry draw.
+
+It also stops the game reading the keyboard and pad while another window has focus (set `RECOMP_INPUT_BACKGROUND=1` to restore the old behaviour).

@@ -429,3 +429,63 @@ index c4d8f9c..e5e6ef0 100644
              hle_d3d8_shadow_set_first_vertex(g_base_vertex);
              hle_d3d8_shadow_draw_indexed(xpt, count, idx, verts, g_stream0_stride, 1);
          }
+diff --git a/src/input/input_bindings.c b/src/input/input_bindings.c
+index ef22573..7e9a523 100644
+--- a/src/input/input_bindings.c
++++ b/src/input/input_bindings.c
+@@ -685,6 +685,37 @@ const char *recomp_bindings_device_name(unsigned port)
+ 
+ #if defined(_WIN32)
+ 
++/* Whether this process owns the foreground window. GetAsyncKeyState and
++ * XInputGetState are global: without this check the title reads every key
++ * typed into another application, and a menu can act on them. Cached for a
++ * few milliseconds because a title polls far more often than it draws.
++ * RECOMP_INPUT_BACKGROUND=1 reads input regardless, for a title run from a
++ * script or beside a debugger. */
++static int window_has_focus(void)
++{
++    static int background = -1;
++    static int focused = 1;
++    static ULONGLONG checked_at;
++    ULONGLONG now = GetTickCount64();
++
++    if (background < 0) {
++        const char *e = getenv("RECOMP_INPUT_BACKGROUND");
++        background = e && *e && *e != '0';
++    }
++    if (background)
++        return 1;
++    if (now - checked_at >= 20u) {
++        DWORD pid = 0;
++        HWND fg = GetForegroundWindow();
++
++        if (fg)
++            GetWindowThreadProcessId(fg, &pid);
++        focused = pid == GetCurrentProcessId();
++        checked_at = now;
++    }
++    return focused;
++}
++
+ /* XInputGetState on an empty slot costs about a millisecond, and a title
+  * polls its pads several times a frame: an unplugged port would cost more
+  * than the game. An empty slot is re-checked once a second, a full one every
+@@ -696,7 +727,7 @@ static int pad_state(int index, XINPUT_STATE *out)
+     static ULONGLONG retry_at[PORTS];
+     ULONGLONG now = GetTickCount64();
+ 
+-    if (index < 0 || index >= PORTS)
++    if (index < 0 || index >= PORTS || !window_has_focus())
+         return 0;
+     if (!connected[index] && now < retry_at[index])
+         return 0;
+@@ -747,7 +778,7 @@ static DWORD g_key_state_at;
+ static int key_down(KeyCache *kc, int vk)
+ {
+     (void)kc;
+-    if (vk <= 0 || vk > 255)
++    if (vk <= 0 || vk > 255 || !window_has_focus())
+         return 0;
+     if (!g_key_state[vk])
+         g_key_state[vk] = (GetAsyncKeyState(vk) & 0x8000) ? 2 : 1;
