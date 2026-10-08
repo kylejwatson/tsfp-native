@@ -44,6 +44,109 @@ index a795bfd..2879c0c 100644
  
      /* Vertex colors: Xbox D3DCOLOR is BGRA in memory, the vertex shader
       * should have already swizzled to RGBA. */
+diff --git a/src/d3d/d3d8_resources.c b/src/d3d/d3d8_resources.c
+index cef025d..c6bed20 100644
+--- a/src/d3d/d3d8_resources.c
++++ b/src/d3d/d3d8_resources.c
+@@ -111,18 +111,20 @@ DXGI_FORMAT d3d8_to_dxgi_format(D3DFORMAT fmt)
+     case D3DFMT_A8:
+     case D3DFMT_LIN_A8:
+         return DXGI_FORMAT_A8_UNORM;
++    /* Luminance is expanded to BGRA at upload (d3d8_convert_linear_pixels).
++     * Stored as R8 / R8G8 it sampled as (L, 0, 0) or (L, A, 0): a D3D11 view
++     * cannot remap channels, and the Xbox reads luminance into all three.
++     * TimeSplitters: Future Perfect's A8L8 arcade icons came out with black as
++     * green and white as yellow. */
+     case D3DFMT_L8:
+     case D3DFMT_LIN_L8:
+-        return DXGI_FORMAT_R8_UNORM;
+     case D3DFMT_L16:
+     case D3DFMT_LIN_L16:
+-        return DXGI_FORMAT_R16_UNORM;
+     case D3DFMT_A8L8:
+     case D3DFMT_LIN_A8L8:
+-        return DXGI_FORMAT_R8G8_UNORM;
+-    case D3DFMT_AL8:            /* expanded to 16-bit at upload */
++    case D3DFMT_AL8:
+     case D3DFMT_LIN_AL8:
+-        return DXGI_FORMAT_R8G8_UNORM;
++        return DXGI_FORMAT_B8G8R8A8_UNORM;
+ 
+     /* 16-bit color channel pairs */
+     case D3DFMT_G8B8:
+@@ -447,9 +449,15 @@ UINT d3d8_upload_bpp(D3DFORMAT fmt)
+     case D3DFMT_UYVY:
+     case D3DFMT_P8:
+         return 32;   /* converted to BGRA */
++    case D3DFMT_L8:
++    case D3DFMT_LIN_L8:
++    case D3DFMT_L16:
++    case D3DFMT_LIN_L16:
++    case D3DFMT_A8L8:
++    case D3DFMT_LIN_A8L8:
+     case D3DFMT_AL8:
+     case D3DFMT_LIN_AL8:
+-        return 16;   /* expanded to A8L8-style R8G8 */
++        return 32;   /* expanded to BGRA (L, L, L, A) */
+     default:
+         return d3d8_format_bpp(fmt);
+     }
+@@ -461,6 +469,12 @@ BOOL d3d8_format_has_conversion(D3DFORMAT fmt)
+     case D3DFMT_YUY2:
+     case D3DFMT_UYVY:
+     case D3DFMT_P8:
++    case D3DFMT_L8:
++    case D3DFMT_LIN_L8:
++    case D3DFMT_L16:
++    case D3DFMT_LIN_L16:
++    case D3DFMT_A8L8:
++    case D3DFMT_LIN_A8L8:
+     case D3DFMT_AL8:
+     case D3DFMT_LIN_AL8:
+     case D3DFMT_R5G5B5A1:
+@@ -504,14 +518,37 @@ void d3d8_convert_linear_pixels(D3DFORMAT fmt, UINT width, UINT height,
+     switch (fmt) {
+     case D3DFMT_AL8:
+     case D3DFMT_LIN_AL8: {
+-        /* 8-bit packed: high nibble alpha, low nibble luma.
+-         * Expand to 16-bit A8L8 (byte0 = luma, byte1 = alpha). */
++        /* 8-bit packed: high nibble alpha, low nibble luma. */
+         for (y = 0; y < height; y++) {
+             const BYTE *s = src + (size_t)y * width;
+-            BYTE *d = dst + (size_t)y * width * 2;
++            BYTE *d = dst + (size_t)y * width * 4;
++            for (x = 0; x < width; x++) {
++                BYTE l = (BYTE)(((s[x] & 0x0F) << 4) | (s[x] & 0x0F));
++                d[x * 4 + 0] = d[x * 4 + 1] = d[x * 4 + 2] = l;
++                d[x * 4 + 3] = (BYTE)(((s[x] >> 4) << 4) | (s[x] >> 4));
++            }
++        }
++        break;
++    }
++
++    case D3DFMT_L8:
++    case D3DFMT_LIN_L8:
++    case D3DFMT_L16:
++    case D3DFMT_LIN_L16:
++    case D3DFMT_A8L8:
++    case D3DFMT_LIN_A8L8: {
++        /* Luminance into B, G and R; A8L8 is luma in the low byte, alpha in
++         * the high one. L16 keeps its high byte. */
++        UINT sb = (fmt == D3DFMT_L8 || fmt == D3DFMT_LIN_L8) ? 1u : 2u;
++        int has_alpha = fmt == D3DFMT_A8L8 || fmt == D3DFMT_LIN_A8L8;
++        int wide = fmt == D3DFMT_L16 || fmt == D3DFMT_LIN_L16;
++        for (y = 0; y < height; y++) {
++            const BYTE *s = src + (size_t)y * width * sb;
++            BYTE *d = dst + (size_t)y * width * 4;
+             for (x = 0; x < width; x++) {
+-                d[x * 2 + 0] = (BYTE)(((s[x] & 0x0F) << 4) | (s[x] & 0x0F));
+-                d[x * 2 + 1] = (BYTE)(((s[x] >> 4) << 4) | (s[x] >> 4));
++                BYTE l = s[x * sb + (wide ? 1 : 0)];
++                d[x * 4 + 0] = d[x * 4 + 1] = d[x * 4 + 2] = l;
++                d[x * 4 + 3] = has_alpha ? s[x * sb + 1] : 0xFF;
+             }
+         }
+         break;
 diff --git a/src/hle/CMakeLists.txt b/src/hle/CMakeLists.txt
 index 1bf284a..d8edfda 100644
 --- a/src/hle/CMakeLists.txt
