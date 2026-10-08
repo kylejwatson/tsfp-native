@@ -1,0 +1,6 @@
+[
+ {
+  "start": "0x0005FCF0",
+  "note": "Indirect-call target observed at runtime while loading the first story mission (caller 0x000A0CB2); unresolved, the lifted level loader then faulted."
+ }
+]

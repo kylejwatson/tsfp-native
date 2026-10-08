@@ -52,10 +52,12 @@ Thumbs.db
 
 # Local bring-up artifacts
 .pipeline/
-dump/
-dump2/
+d*/*.png
+d*/*.bmp
 *.log
 old/
 lift.log
 run*.log
 xbox_kernel.log
+d[0-9]*/
+d[0-9]*.log

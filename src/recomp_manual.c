@@ -106,6 +106,28 @@ extern RECOMP_MANUAL_TLS uint32_t g_icall_saved_esp;
  * means this title was lifted before the macros published it. */
 extern RECOMP_MANUAL_TLS uint32_t g_icall_dispatch_form;
 
+/* ── TimeSplitters: Future Perfect overrides ───────────────── */
+
+/* sub_000245C0: the MSVC CRT memcpy (cdecl: dst, src, n; returns dst).
+ *
+ * Replaced because it enters its unrolled `movsb` tail with a computed
+ * `jmp ecx` to a point in the middle of the function (0x24604..0x2460C), which
+ * the lifter cannot translate: the load stopped at "[ICALL] unresolved jump
+ * target 0x0002460C". A native copy is also much faster than the lifted
+ * string/MMX loops. memmove, since a caller may rely on the overlap-safe
+ * behaviour the original had for forward-overlapping blocks. */
+void sub_000245C0(void)
+{
+    uint32_t dst = *(uint32_t *)((uint8_t *)g_xbox_mem_offset + g_esp + 4);
+    uint32_t src = *(uint32_t *)((uint8_t *)g_xbox_mem_offset + g_esp + 8);
+    uint32_t n   = *(uint32_t *)((uint8_t *)g_xbox_mem_offset + g_esp + 12);
+
+    memmove((uint8_t *)g_xbox_mem_offset + dst,
+            (uint8_t *)g_xbox_mem_offset + src, n);
+    g_eax = dst;
+    g_esp += 4;     /* the `ret` */
+}
+
 /* ── Manual function overrides ─────────────────────────────── */
 
 /*
