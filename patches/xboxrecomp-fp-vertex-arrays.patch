@@ -1,0 +1,431 @@
+diff --git a/src/hle/CMakeLists.txt b/src/hle/CMakeLists.txt
+index 1bf284a..d8edfda 100644
+--- a/src/hle/CMakeLists.txt
++++ b/src/hle/CMakeLists.txt
+@@ -18,6 +18,7 @@ add_library(xbox_hle STATIC
+     hle_d3d8_state.c
+     hle_d3d8_texture.c
+     hle_d3d8_vertex.c
++    hle_d3d8_push.c
+     hle_d3d8_record.c
+     d3d8_capture.c
+     hle_dsound.c
+diff --git a/src/hle/hle_d3d8.c b/src/hle/hle_d3d8.c
+index c36f128..2b37547 100644
+--- a/src/hle/hle_d3d8.c
++++ b/src/hle/hle_d3d8.c
+@@ -623,6 +623,12 @@ struct shadow_program {
+ #define NO_FIRST_VERTEX 0xFFFFFFFFu
+ static uint32_t g_draw_first = NO_FIRST_VERTEX;
+ void hle_d3d8_shadow_set_first_vertex(uint32_t first) { g_draw_first = first; }
++
++/* The guest vertex shader object of the program selected now, for
++ * hle_d3d8_push.c, which lays the title's own arrays out to match its
++ * declaration; 0 when the selected shader is not a program. */
++uint32_t hle_d3d8_shadow_program_object(void);
++
+ /* From hle_d3d8_vertex.c: vertex `first` of stream `stream`, or NULL. */
+ const void *hle_d3d8_stream_vertices(uint32_t stream, uint32_t first, uint32_t vertices,
+                                      uint32_t *stride);
+@@ -839,6 +845,11 @@ static void note_draw_format(uint32_t xpt, uint32_t stride)
+     }
+ }
+ 
++uint32_t hle_d3d8_shadow_program_object(void)
++{
++    return g_shadow_vs_is_program ? (g_shadow_vs & ~1u) : 0u;
++}
++
+ /* Common checks for a draw under the current vertex shader. */
+ static int shadow_can_draw(uint32_t xpt, uint32_t stride)
+ {
+@@ -862,6 +873,27 @@ static int shadow_can_draw(uint32_t xpt, uint32_t stride)
+             return 0;
+         }
+         if (stride < p->extent) {        /* the layout would read past a vertex */
++            static uint32_t said[32];
++            static int nsaid;
++            int k, fresh;
++            for (k = 0; k < nsaid && said[k] != (g_shadow_vs ^ (stride << 20) ^ ((uint32_t)p->extent << 8)); k++) ;
++            fresh = (k == nsaid && nsaid < 32);
++            if (fresh) {
++                said[nsaid++] = g_shadow_vs ^ (stride << 20) ^ ((uint32_t)p->extent << 8);
++                fprintf(stderr, "[HLE-D3D8] stride skip: program 0x%08X extent %u > stride %u, primitive %u\n",
++                        g_shadow_vs, (unsigned)p->extent, stride, xpt);
++            }
++            if (fresh && getenv("RECOMP_HLE_D3D8_DECL_DUMP")) {
++                uint32_t object = g_shadow_vs & ~1u, q;
++                fprintf(stderr, "[HLE-D3D8]   guest declaration now:");
++                for (q = 0; q < 16u; q++) {
++                    uint32_t at = object + 20u + q * 16u;
++                    if (HLE_MEM32(at + 8u) > 0x02u)
++                        fprintf(stderr, " v%u(s%u +%u fmt 0x%02X)", q, HLE_MEM32(at),
++                                HLE_MEM32(at + 4u), HLE_MEM32(at + 8u));
++                }
++                fputc(10, stderr);
++            }
+             g_draws_stride++;
+             return 0;
+         }
+@@ -1988,6 +2020,16 @@ static void shadow_read_declaration(int slot, uint32_t handle)
+         n++;
+     }
+ 
++    if (getenv("RECOMP_HLE_D3D8_DECL_DUMP")) {
++        fprintf(stderr, "[HLE-D3D8] declaration 0x%08X:", handle);
++        for (i = 0; i < 16u; i++) {
++            uint32_t attr = object + 20u + i * 16u;
++            if (HLE_MEM32(attr + 8u) > 0x02u)
++                fprintf(stderr, " v%u(s%u +%u fmt 0x%02X)", i, HLE_MEM32(attr),
++                        HLE_MEM32(attr + 4u), HLE_MEM32(attr + 8u));
++        }
++        fputc('\n', stderr);
++    }
+     if (!refused && n > 0 && SUCCEEDED(host_vsh_set_declaration(p->host, in, n))) {
+         p->has_declaration = 1;
+         p->packed_count = packed;
+diff --git a/src/hle/hle_d3d8_push.c b/src/hle/hle_d3d8_push.c
+new file mode 100644
+index 0000000..61e0bef
+--- /dev/null
++++ b/src/hle/hle_d3d8_push.c
+@@ -0,0 +1,296 @@
++/*
++ * hle_d3d8_push.c -- the NV2A vertex arrays, read from the push buffer.
++ *
++ * Part of shadow mode (hle_d3d8.c). Every replacement runs the title's own
++ * body first, so by the time a draw reaches the shadow renderer the guest push
++ * buffer holds exactly what the hardware would be given.
++ *
++ * The vertex buffer draws in hle_d3d8_vertex.c find their vertices through
++ * SetStreamSource: stream 0's buffer and stride. That is the XDK's view, and a
++ * title that sets the arrays itself -- reserving space with BeginPush, writing
++ * SET_VERTEX_DATA_ARRAY_OFFSET / _FORMAT, ending with EndPush -- gives the
++ * hardware a different one: separate arrays per attribute, each with its own
++ * stride. TimeSplitters: Future Perfect does this for its world and its
++ * characters (one function, 0x0001EB00, sets all sixteen), and under the
++ * stream 0 view every such draw read past a 24-byte stride and was skipped.
++ *
++ * So the push buffer itself is read: at every draw and at EndPush, whatever
++ * was written since the last look is walked as NV2A method packets and the
++ * array registers are kept. That is ground truth whoever wrote them, the title
++ * or the XDK. hle_d3d8_title_vertices then gathers the arrays into one
++ * interleaved vertex in the layout the selected program's declaration gives.
++ * It is a fallback: it is only used when the stream 0 view cannot hold the
++ * declared vertex, which is exactly when the old path skipped the draw.
++ *
++ * RECOMP_HLE_D3D8_PUSH_DUMP=1 also reports which methods were written, which
++ * is the first thing to know about a title that fills its own push buffer.
++ */
++#include "platform/xbox_winnt.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include "hle.h"
++
++#ifdef _WIN32
++
++HLE_ORIGINAL(D3DDevice_EndPush);
++HLE_IMPORT_VAR(D3D_g_pDevice);
++
++#define PUSH_MAX_METHODS 512
++#define NV_ATTRS 16
++#define CONTIG_BASE 0x80000000u
++#define CONTIG_SIZE (64u * 1024u * 1024u)
++
++/* The NV2A vertex arrays as last written: per attribute a DMA offset
++ * (0x1720 + 4i) and a format, stride << 8 | count << 4 | type. */
++static uint32_t g_arr_offset[NV_ATTRS], g_arr_format[NV_ATTRS];
++
++static struct { uint32_t method; unsigned long writes; uint32_t first; } g_seen[PUSH_MAX_METHODS];
++static int g_seen_count;
++static unsigned long g_syncs, g_words, g_lost, g_title_draws, g_title_missing;
++
++/* Title RAM or the contiguous window: the only places a push buffer lives. A
++ * walk follows jumps and runs ahead of a pointer it does not trust, so every
++ * word it reads is checked first. */
++static int readable(uint32_t va, uint64_t bytes)
++{
++    if (va >= 0x00010000u && (uint64_t)va + bytes <= g_xbox_total_ram)
++        return 1;
++    return va >= CONTIG_BASE && (uint64_t)va + bytes <= (uint64_t)CONTIG_BASE + CONTIG_SIZE;
++}
++
++static int dump_enabled(void)
++{
++    static int on = -1;
++    if (on < 0)
++        on = getenv("RECOMP_HLE_D3D8_PUSH_DUMP") != NULL;
++    return on;
++}
++
++static void note_method(uint32_t method, uint32_t first)
++{
++    int i;
++
++    for (i = 0; i < g_seen_count; i++)
++        if (g_seen[i].method == method) {
++            g_seen[i].writes++;
++            return;
++        }
++    if (g_seen_count < PUSH_MAX_METHODS) {
++        g_seen[g_seen_count].method = method;
++        g_seen[g_seen_count].writes = 1;
++        g_seen[g_seen_count].first = first;
++        g_seen_count++;
++    }
++}
++
++static void report(void)
++{
++    static DWORD last;
++    DWORD now = GetTickCount();
++    int i;
++
++    if (!last) {
++        last = now;
++        return;
++    }
++    if (now - last < 10000)
++        return;
++    last = now;
++    fprintf(stderr, "[HLE-D3D8] push buffer: %lu syncs, %lu dwords, %lu lost; "
++                    "title-array draws %lu, out of range %lu; methods:\n",
++            g_syncs, g_words, g_lost, g_title_draws, g_title_missing);
++    for (i = 0; i < g_seen_count; i++)
++        fprintf(stderr, "[HLE-D3D8]   0x%04X x%lu (first 0x%08X)\n",
++                g_seen[i].method, g_seen[i].writes, g_seen[i].first);
++}
++
++static void track(uint32_t method, uint32_t value)
++{
++    if (method >= 0x1720u && method < 0x1720u + 4u * NV_ATTRS)
++        g_arr_offset[(method - 0x1720u) / 4u] = value;
++    else if (method >= 0x1760u && method < 0x1760u + 4u * NV_ATTRS)
++        g_arr_format[(method - 0x1760u) / 4u] = value;
++}
++
++/* Walk [p, end) as NV2A method packets, a header with the method in its low
++ * bits, a count above them, and bit 30 for "same method". Returns where it
++ * stopped: `end`, or the word that was a jump (*jump set to its target) or
++ * could not be read as a packet (*jump left 0). */
++static uint32_t walk(uint32_t p, uint32_t end, uint32_t *jump)
++{
++    *jump = 0;
++    while (p + 4u <= end) {
++        uint32_t w;
++
++        if (!readable(p, 4u))
++            return p;
++        w = HLE_MEM32(p);
++        uint32_t method = w & 0x1FFCu, count = (w >> 18) & 0x7FFu, i;
++        int non_inc = (w & 0x40000000u) != 0;
++
++        if (!w) {                       /* padding */
++            p += 4u;
++            continue;
++        }
++        if ((w & 3u) == 1u) {           /* old-style jump: address in bits 2..28 */
++            *jump = CONTIG_BASE | (w & 0x1FFFFFFCu);
++            return p;
++        }
++        if ((w & 3u) || p + 4u + count * 4u > end || !readable(p, 4u + count * 4u))
++            return p;
++        for (i = 0; i < count; i++) {
++            uint32_t m = non_inc ? method : method + i * 4u, v = HLE_MEM32(p + 4u + i * 4u);
++            track(m, v);
++            if (dump_enabled())
++                note_method(m, v);
++        }
++        g_words += 1u + count;
++        p += 4u + count * 4u;
++    }
++    return p;
++}
++
++/* Bring the tracked state up to the device's push pointer. */
++void hle_d3d8_push_sync(void)
++{
++    static uint32_t pos;
++    uint32_t cur, device, jump, at;
++    int hops;
++
++    if (!hle_var_D3D_g_pDevice)
++        return;
++    device = HLE_MEM32(hle_var_D3D_g_pDevice);
++    if (!device || !readable(device, 4u))
++        return;
++    cur = HLE_MEM32(device);
++    if (!readable(cur, 4u) || cur == pos) {
++        if (dump_enabled())
++            report();
++        return;
++    }
++    g_syncs++;
++    if (!pos) {
++        pos = cur;
++        return;
++    }
++    at = pos;
++    for (hops = 0; hops < 8 && at != cur; hops++) {
++        uint32_t stop;
++
++        if (cur > at && cur - at <= 0x40000u) {
++            stop = walk(at, cur, &jump);
++        } else {                        /* the buffer wrapped: run to its jump */
++            stop = walk(at, at + 0x100000u, &jump);
++            if (!jump) {
++                g_lost++;
++                at = cur;
++                break;
++            }
++        }
++        if (jump) {
++            at = jump;
++            continue;
++        }
++        if (stop != cur) {              /* an unreadable packet; resume at the end */
++            g_lost++;
++            at = cur;
++        } else {
++            at = stop;
++        }
++    }
++    pos = cur;
++    if (dump_enabled())
++        report();
++}
++
++/* void D3DDevice_EndPush(DWORD *pPush) -- stores pPush as the device's push
++ * pointer. BeginPush is not replaced: it tail-calls the XDK's space
++ * reservation and has no single `ret N`. */
++HLE_EXPORT(D3DDevice_EndPush)
++{
++    if (!hle_original_D3DDevice_EndPush)
++        HLE_RETURN(0u);
++    HLE_CALL_ORIGINAL(D3DDevice_EndPush);
++    hle_d3d8_push_sync();
++}
++
++/* Bytes an X_D3DVSDT / NV2A array format occupies per element. */
++static uint32_t format_bytes(uint32_t fmt)
++{
++    static const uint8_t per[8] = { 1, 2, 4, 0, 1, 2, 4, 0 };
++    uint32_t type = fmt & 0xFu, count = (fmt >> 4) & 0xFu;
++
++    if (type == 6u)
++        return 4u;                  /* CMP / NORMPACKED3 */
++    return per[type & 7u] * count;
++}
++
++/* From hle_d3d8.c: the guest vertex shader object of the program selected
++ * now, whose 16 attribute slots at +20 hold the declaration; 0 if none. */
++uint32_t hle_d3d8_shadow_program_object(void);
++
++/* The vertices [first, first + vertices) of the title's own arrays, laid out
++ * as the selected program's declaration says one interleaved vertex looks, so
++ * the shadow draw reads them like any stream 0 vertex.
++ *
++ * Returns NULL, leaving the stream 0 path to it, unless the declared vertex
++ * is larger than `stream_stride` -- the case that path skips. Also NULL when
++ * there is no program, an array runs outside the contiguous window, or no
++ * array stands behind a declared register. The buffer is the caller's until
++ * the next call on this thread. */
++const void *hle_d3d8_title_vertices(uint32_t first, uint32_t vertices,
++                                    uint32_t stream_stride, uint32_t *stride_out)
++{
++    static __declspec(thread) uint8_t *buf;
++    static __declspec(thread) size_t cap;
++    uint32_t object = hle_d3d8_shadow_program_object(), extent = 0, stride, i, v;
++    uint32_t doff[NV_ATTRS], dsize[NV_ATTRS];
++    size_t need;
++
++    if (!object || !vertices)
++        return NULL;
++    for (i = 0; i < NV_ATTRS; i++) {
++        uint32_t attr = object + 20u + i * 16u, fmt = HLE_MEM32(attr + 8u);
++
++        doff[i] = HLE_MEM32(attr + 4u);
++        dsize[i] = fmt > 2u ? format_bytes(fmt) : 0u;
++        if (dsize[i] && doff[i] + dsize[i] > extent)
++            extent = doff[i] + dsize[i];
++    }
++    if (!extent || extent > 256u || extent <= stream_stride)
++        return NULL;
++    hle_d3d8_push_sync();
++    stride = (extent + 3u) & ~3u;
++    need = (size_t)stride * vertices;
++    if (need > cap) {
++        uint8_t *grown = (uint8_t *)realloc(buf, need);
++        if (!grown)
++            return NULL;
++        buf = grown;
++        cap = need;
++    }
++    memset(buf, 0, need);
++    for (i = 0; i < NV_ATTRS; i++) {
++        uint32_t afmt = g_arr_format[i], astride = (afmt >> 8) & 0xFFu;
++        uint32_t esize = format_bytes(afmt), n = dsize[i] < esize ? dsize[i] : esize;
++        uint64_t base, last;
++
++        if (!dsize[i] || !n || (afmt & 0xFFu) <= 2u)
++            continue;               /* not declared, or no array behind it */
++        base = (uint64_t)CONTIG_BASE + (g_arr_offset[i] & (CONTIG_SIZE - 1u));
++        last = base + (uint64_t)(first + vertices - 1u) * astride + n;
++        if (last > (uint64_t)CONTIG_BASE + CONTIG_SIZE) {
++            g_title_missing++;
++            return NULL;
++        }
++        for (v = 0; v < vertices; v++)
++            memcpy(buf + (size_t)v * stride + doff[i],
++                   HLE_PTR((uint32_t)(base + (uint64_t)(first + v) * astride)), n);
++    }
++    g_title_draws++;
++    *stride_out = stride;
++    return buf;
++}
++
++#endif /* _WIN32 */
+diff --git a/src/hle/hle_d3d8_vertex.c b/src/hle/hle_d3d8_vertex.c
+index c4d8f9c..e5e6ef0 100644
+--- a/src/hle/hle_d3d8_vertex.c
++++ b/src/hle/hle_d3d8_vertex.c
+@@ -55,6 +55,11 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
+ void hle_d3d8_shadow_draw_indexed(uint32_t xpt, uint32_t count, const uint16_t *idx,
+                                   const void *verts, uint32_t stride, int from_buffer);
+ void hle_d3d8_shadow_set_first_vertex(uint32_t first);
++/* From hle_d3d8_push.c: the vertex arrays the title (or the XDK) wrote to the
++ * push buffer, gathered into the declaration's layout when the stream 0 view
++ * cannot hold the declared vertex. */
++const void *hle_d3d8_title_vertices(uint32_t first, uint32_t vertices,
++                                    uint32_t stream_stride, uint32_t *stride);
+ 
+ #define CONTIG_BASE 0x80000000u
+ #define CONTIG_SIZE (64u * 1024u * 1024u)    /* kernel.h XBOX_CONTIG_SIZE */
+@@ -226,8 +231,12 @@ HLE_EXPORT(D3DDevice_DrawVertices)
+     HLE_CALL_ORIGINAL(D3DDevice_DrawVertices);
+ #ifdef _WIN32
+     if (hle_d3d8_shadow_device() && count) {
+-        const void *verts = stream0_vertices(start, count);
++        uint32_t tstride = 0;
++        const void *verts = hle_d3d8_title_vertices(start, count, g_stream0_stride, &tstride);
+         if (verts) {
++            /* The arrays the title set itself, in the declaration's layout. */
++            hle_d3d8_shadow_draw(xpt, count, verts, tstride, 1);
++        } else if ((verts = stream0_vertices(start, count)) != NULL) {
+             hle_d3d8_shadow_set_first_vertex(start);
+             hle_d3d8_shadow_draw(xpt, count, verts, g_stream0_stride, 1);
+         }
+@@ -267,8 +276,11 @@ HLE_EXPORT(D3DDevice_DrawIndexedVertices)
+                 fprintf(stderr, "[HLE-D3D8] shadow buffers: CDevice_SetStateVB never "
+                         "ran; indexed buffer draws use base vertex 0\n");
+         }
+-        verts = stream0_vertices(g_base_vertex, vertices);
++        uint32_t tstride = 0;
++        verts = hle_d3d8_title_vertices(0, vertices, g_stream0_stride, &tstride);
+         if (verts) {
++            hle_d3d8_shadow_draw_indexed(xpt, count, idx, verts, tstride, 1);
++        } else if ((verts = stream0_vertices(g_base_vertex, vertices)) != NULL) {
+             hle_d3d8_shadow_set_first_vertex(g_base_vertex);
+             hle_d3d8_shadow_draw_indexed(xpt, count, idx, verts, g_stream0_stride, 1);
+         }

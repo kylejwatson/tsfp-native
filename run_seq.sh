@@ -2,7 +2,7 @@
 # usage: run_seq.sh <outdir> <seq> <secs> [dump_every]
 cd /c/Users/mail/Documents/mygame/build
 mkdir -p ../$1; rm -f ../$1/*.bmp ../$1/*.png 2>/dev/null
-RECOMP_MUTE=1 RECOMP_FPS=5 RECOMP_INPUT_SEQ="$2" RECOMP_HLE_D3D8_DUMP=../$1/h RECOMP_HLE_D3D8_DUMP_EVERY=${4:-200} RECOMP_HLE_D3D8_DUMP_MINDRAWS=1 timeout $3 ./futureperfect_recomp.exe > ../$1.log 2>&1
+RECOMP_MUTE=1 RECOMP_FPS=5 RECOMP_INPUT_SEQ="$2" RECOMP_HLE_D3D8_DUMP=../$1/h RECOMP_HLE_D3D8_DUMP_EVERY=${4:-200} RECOMP_HLE_D3D8_DUMP_MINDRAWS=${MINDRAWS:-1} timeout $3 ./futureperfect_recomp.exe > ../$1.log 2>&1
 cd ..
 py -3 xboxrecomp/scripts/bmp_to_png.py -o $1 $1/h*.bmp >/dev/null
 py -3 - <<PY

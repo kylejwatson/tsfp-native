@@ -61,3 +61,4 @@ run*.log
 xbox_kernel.log
 d[0-9]*/
 d[0-9]*.log
+caps/
