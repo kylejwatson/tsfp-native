@@ -1,0 +1,182 @@
+[replay] caps2/c_04200.d3dcap: frame 4200, 640x480, 6578 chunks
+[CONFIG] settings from C:\Users\mail\AppData\Roaming\xboxrecomp\titles\default.conf (title 00000000)
+D3D8: Fixed-function shaders compiled OK (multi-texture + lighting + fog)
+NV2A combiners: Initialized (cache size=128)
+D3D8 VSH: Vertex shader translator initialized
+D3D8: Device created (640x480)
+D3D8 VSH: Created shader handle 0x10000 (4 instructions)
+D3D8 VSH: Created shader handle 0x10001 (5 instructions)
+D3D8 VSH: Created shader handle 0x10002 (2 instructions)
+D3D8 VSH: Created shader handle 0x10003 (3 instructions)
+D3D8 VSH: Created shader handle 0x10004 (12 instructions)
+D3D8 VSH: Created shader handle 0x10005 (5 instructions)
+D3D8 VSH: Created shader handle 0x10006 (12 instructions)
+D3D8 VSH: Created shader handle 0x10007 (3 instructions)
+D3D8 VSH: Created shader handle 0x10008 (6 instructions)
+D3D8 VSH: Created shader handle 0x10009 (9 instructions)
+D3D8 VSH: Created shader handle 0x1000A (10 instructions)
+D3D8 VSH: Created shader handle 0x1000B (11 instructions)
+D3D8 VSH: Created shader handle 0x1000C (39 instructions)
+D3D8 VSH: Created shader handle 0x1000D (27 instructions)
+D3D8 VSH: Created shader handle 0x1000E (24 instructions)
+D3D8 VSH: Created shader handle 0x1000F (35 instructions)
+D3D8 VSH: Created shader handle 0x10010 (15 instructions)
+D3D8 VSH: Created shader handle 0x10011 (37 instructions)
+D3D8 VSH: Created shader handle 0x10012 (8 instructions)
+D3D8 VSH: Created shader handle 0x10013 (4 instructions)
+D3D8 VSH: Created shader handle 0x10014 (13 instructions)
+D3D8 VSH: Compiled shader (hash 0xC0B6379C, 4 insns, inputs 0x010E)
+D3D8 VSH: a program reads v8, which its declaration does not feed; it reads the register's current value
+NV2A combiners: shader C8E6C947: state stages 1, tex_mode 0 3 3 3, c0[0] 0x00000000 c1[0] 0x00000000, final_c0 0x00000000 final_c1 0x00000000
+--- Generated HLSL ---
+Texture2D    tex0 : register(t0);
+SamplerState samp0 : register(s0);
+
+cbuffer CombinerCB : register(b0) {
+    float4 c0[8];
+    float4 c1[8];
+    float4 fc0;
+    float4 fc1;
+    float4 fog_color;
+    float  alpha_ref;
+    uint   alpha_func;
+    uint   alpha_test_enable;
+    uint   fog_enable;
+    uint4  alpha_only;
+    float4 tex_scale[4];
+};
+
+struct PS_IN {
+    float4 pos     : SV_POSITION;
+    float4 color0  : COLOR0;
+    float4 color1  : COLOR1;
+    float3 tc0     : TEXCOORD0;
+    float3 tc1     : TEXCOORD1;
+    float3 tc2     : TEXCOORD2;
+    float3 tc3     : TEXCOORD3;
+    float  fog     : TEXCOORD4;
+};
+
+float4 main(PS_IN input) : SV_TARGET {
+    /* Register file initialization */
+    float4 r_zero = float4(0, 0, 0, 0);
+    float4 r_c0   = c0[0];
+    float4 r_c1   = c1[0];
+    float4 r_fog  = float4(fog_color.rgb, fog_enable ? input.fog : 1.0);
+    float4 r_v0   = input.color0;
+    float4 r_v1   = input.color1;
+    float4 r_t0 = tex0.Sample(samp0, input.tc0.xy * tex_scale[0].xy);
+    if (alpha_only[0]) r_t0.rgb = 1.0;
+    float4 r_t1 = float4(0, 0, 0, 0);
+    float4 r_t2 = float4(0, 0, 0, 0);
+    float4 r_t3 = float4(0, 0, 0, 0);
+    float4 r_r0 = r_t0;
+    float4 r_r1 = float4(0, 0, 0, 0);
+
+    /* ---- Stage 0 ---- */
+    r_c0 = c0[0];
+    r_c1 = c1[0];
+    {
+        float3 a_rgb = r_v0.rgb;
+        float3 b_rgb = r_t0.rgb;
+        float3 ab_rgb = a_rgb * b_rgb;
+        float3 c_rgb = max(r_zero.rgb, 0.0);
+        float3 d_rgb = max(r_zero.rgb, 0.0);
+        float3 cd_rgb = c_rgb * d_rgb;
+        float3 sum_rgb = ab_rgb + cd_rgb;
+        r_r0.rgb = (ab_rgb * 2.0);
+    }
+    {
+        float a_a = r_v0.a;
+        float b_a = r_t0.a;
+        float ab_a = a_a * b_a;
+        float c_a = max(r_zero.a, 0.0);
+        float d_a = max(r_zero.a, 0.0);
+        float cd_a = c_a * d_a;
+        float sum_a = ab_a + cd_a;
+        r_r0.a = (ab_a * 2.0);
+    }
+
+    /* ---- Final Combiner ---- */
+    float4 r_ef = float4(0, 0, 0, 0);
+    float4 r_v1r0sum = float4(0, 0, 0, 0);
+    {
+        float4 e_val = float4(max(r_zero.rgb, 0.0), max(r_zero.b, 0.0));
+        float4 f_val = float4(max(r_zero.rgb, 0.0), max(r_zero.b, 0.0));
+        r_ef = e_val * f_val;
+    }
+    r_v1r0sum = saturate(r_v1 + r_r0);
+
+    float4 result;
+    {
+        float3 fc_a = max(r_fog.aaa, 0.0);
+        float3 fc_b = max(r_fog.rgb, 0.0);
+        float3 fc_c = max(r_r0.rgb, 0.0);
+        float3 fc_d = max(r_zero.rgb, 0.0);
+        result.rgb = saturate(fc_d + fc_a * fc_b + (1.0 - fc_a) * fc_c);
+        result.a = max(r_r0.a, 0.0);
+    }
+
+    /* Alpha test */
+    if (alpha_test_enable) {
+        bool alpha_pass = true;
+        if      (alpha_func == 1u) alpha_pass = false;
+        else if (alpha_func == 2u) alpha_pass = (result.a <  alpha_ref);
+        else if (alpha_func == 3u) alpha_pass = (result.a == alpha_ref);
+        else if (alpha_func == 4u) alpha_pass = (result.a <= alpha_ref);
+        else if (alpha_func == 5u) alpha_pass = (result.a >  alpha_ref);
+        else if (alpha_func == 6u) alpha_pass = (result.a != alpha_ref);
+        else if (alpha_func == 7u) alpha_pass = (result.a >= alpha_ref);
+        if (!alpha_pass) discard;
+    }
+
+    return result;
+}
+
+--- End HLSL ---
+NV2A combiners: binding shader C8E6C947
+D3D8 VSH: Compiled shader (hash 0x8BD628A2, 9 insns, inputs 0x000E)
+D3D8 VSH: Compiled shader (hash 0x8974E927, 10 insns, inputs 0x000E)
+NV2A combiners: binding shader 78E2FE65
+D3D8 VSH: Compiled shader (hash 0xA3467472, 24 insns, inputs 0x000E)
+D3D8 VSH: a program reads v2, which its declaration does not feed; it reads the register's current value
+NV2A combiners: binding shader C8E6C947
+D3D8 VSH: Compiled shader (hash 0x943B17FA, 35 insns, inputs 0x002A)
+D3D8 VSH: a program reads v5, which its declaration does not feed; it reads the register's current value
+NV2A combiners: binding shader 78E2FE65
+NV2A combiners: binding shader C8E6C947
+NV2A combiners: binding shader 78E2FE65
+NV2A combiners: binding shader C8E6C947
+NV2A combiners: binding shader 78E2FE65
+NV2A combiners: binding shader C8E6C947
+D3D8 VSH: Compiled shader (hash 0x7E7873A6, 15 insns, inputs 0x000F)
+D3D8 VSH: a program reads v0, which its declaration does not feed; it reads the register's current value
+D3D8 VSH: a program reads v2, which its declaration does not feed; it reads the register's current value
+D3D8 VSH: Compiled shader (hash 0x2A1F6E86, 37 insns, inputs 0x002B)
+D3D8 VSH: a program reads v0, which its declaration does not feed; it reads the register's current value
+NV2A combiners: binding shader C7855195
+D3D8 VSH: Compiled shader (hash 0xF243734B, 11 insns, inputs 0x000E)
+NV2A combiners: binding shader C8E6C947
+D3D8 VSH: Compiled shader (hash 0x31F88118, 39 insns, inputs 0x000F)
+D3D8 VSH: Compiled shader (hash 0x89E4D9F9, 13 insns, inputs 0x001E)
+NV2A combiners: binding shader 1BAD7D26
+D3D8 VSH: Compiled shader (hash 0xC319D189, 12 insns, inputs 0x000E)
+D3D8 VSH: Compiled shader (hash 0x81F72C58, 8 insns, inputs 0x070E)
+NV2A combiners: binding shader CB2D8F21
+NV2A combiners: binding shader C8E6C947
+D3D8 VSH: Compiled shader (hash 0x4176C0F8, 3 insns, inputs 0x000E)
+NV2A combiners: binding shader 1BAD7D26
+D3D8 VSH: Compiled shader (hash 0xFE4E87B3, 2 insns, inputs 0x0006)
+NV2A combiners: binding shader 2FC8BB35
+NV2A combiners: binding shader 6C0A8FCA
+D3D8 VSH: a program reads v0, which its declaration does not feed; it reads the register's current value
+D3D8 VSH: a program reads v2, which its declaration does not feed; it reads the register's current value
+NV2A combiners: binding shader C8E6C947
+D3D8 VSH: Compiled shader (hash 0xCF85BF97, 5 insns, inputs 0x000E)
+NV2A combiners: binding shader 6C0A8FCA
+NV2A combiners: binding shader 1BAD7D26
+D3D8 VSH: Compiled shader (hash 0xD756F822, 4 insns, inputs 0x0006)
+NV2A combiners: binding shader 2FC8BB35
+[replay] wrote rep/x_000.bmp
+[replay] loop 0 executed: frame_start 1 clear 2 render_state 1448 texture_stage_state 2952 transform 10 viewport 5 set_texture 201 set_vertex_shader 150 draw_up 130 draw_indexed_up 211 texture 63 vs_create 21 vs_declaration 170 vs_constants 783 vs_screenspace 17 ps_token 342 depth_surface 1 set_render_target 9 vs_vertex_data 16 scissors 29 material 1 light 8 light_enable 8
+[replay] loop 0: 0 host calls failed, 0 malformed chunks, 0 unmapped handles, 0 unknown chunks

@@ -1,0 +1,3210 @@
+[replay] caps2/c_04200.d3dcap: frame 4200, 640x480, 6578 chunks
+[CONFIG] settings from C:\Users\mail\AppData\Roaming\xboxrecomp\titles\default.conf (title 00000000)
+D3D8: Fixed-function shaders compiled OK (multi-texture + lighting + fog)
+NV2A combiners: Initialized (cache size=128)
+D3D8 VSH: Vertex shader translator initialized
+D3D8: Device created (640x480)
+D3D8 VSH: Created shader handle 0x10000 (4 instructions)
+D3D8 VSH: Created shader handle 0x10001 (5 instructions)
+D3D8 VSH: Created shader handle 0x10002 (2 instructions)
+D3D8 VSH: Created shader handle 0x10003 (3 instructions)
+D3D8 VSH: Created shader handle 0x10004 (12 instructions)
+D3D8 VSH: Created shader handle 0x10005 (5 instructions)
+D3D8 VSH: Created shader handle 0x10006 (12 instructions)
+D3D8 VSH: Created shader handle 0x10007 (3 instructions)
+D3D8 VSH: Created shader handle 0x10008 (6 instructions)
+D3D8 VSH: Created shader handle 0x10009 (9 instructions)
+D3D8 VSH: Created shader handle 0x1000A (10 instructions)
+D3D8 VSH: Created shader handle 0x1000B (11 instructions)
+D3D8 VSH: Created shader handle 0x1000C (39 instructions)
+D3D8 VSH: Created shader handle 0x1000D (27 instructions)
+D3D8 VSH: Created shader handle 0x1000E (24 instructions)
+D3D8 VSH: Created shader handle 0x1000F (35 instructions)
+D3D8 VSH: Created shader handle 0x10010 (15 instructions)
+D3D8 VSH: Created shader handle 0x10011 (37 instructions)
+D3D8 VSH: Created shader handle 0x10012 (8 instructions)
+D3D8 VSH: Created shader handle 0x10013 (4 instructions)
+D3D8 VSH: Created shader handle 0x10014 (13 instructions)
+--- VS HLSL hash 0xC0B6379C, 4 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+    float4 v8 : ATTR8;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+    float4 v8 = xboxVertexFed[2][0] != 0 ? input.v8 : xboxVertexData[8];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (4 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = v1;
+        oPos = (_mac);
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = v2.zyxw;
+        oD0 = (_mac);
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = v3;
+        oT0.xy = (_mac).xy;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = v8;
+        oT1.xy = (_mac).xy;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0xC0B6379C, 4 insns, inputs 0x010E)
+D3D8 VSH: a program reads v8, which its declaration does not feed; it reads the register's current value
+--- VS HLSL hash 0x8BD628A2, 9 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (9 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[68]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = dot(v1, c[69]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[70]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v1, c[71]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = (R12.xyzz * c[58].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = v3.xyyy;
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oT0.xy = (_mac).xy;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _ilu = v2.zyxw;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _ilu = c[24].wwww;
+        oFog.x = (_ilu).x;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = (R12.xyzz * R1.xxxx + c[59].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x8BD628A2, 9 insns, inputs 0x000E)
+--- VS HLSL hash 0x8974E927, 10 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (10 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[68]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = dot(v1, c[69]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[70]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v1, c[71]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = (v3.xyyy * c[11].xyyy);
+        oT0.xy = (_mac).xy;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = v2.zyxw;
+        oD0 = (_mac);
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = (R12.zzzz * c[24].xxxx + c[24].yyyy);
+        R2.x = (_mac).x;
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = (R12 * c[58]);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oPos.xyz = (_mac).xyz;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = min(R2.xxxx, c[24].zzzz);
+        oFog.x = (_mac).x;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = (R12 * R1.xxxx + c[59]);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x8974E927, 10 insns, inputs 0x000E)
+--- VS HLSL hash 0xA3467472, 24 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (24 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[72]).xxxx;
+        R6.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = dot(v1, c[73]).xxxx;
+        R6.y = (_mac).y;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[74]).xxxx;
+        R6.z = (_mac).z;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v3.xyzz.xyz, c[72].xyzz.xyz).xxxx;
+        R5.x = (_mac).x;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = (R6.xyzz + (-c[15].xyzz));
+        R2.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = dot(v3.xyzz.xyz, c[73].xyzz.xyz).xxxx;
+        R5.y = (_mac).y;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = dot(R2.xyzz.xyz, R2.xyzz.xyz).xxxx;
+        float4 _ilu = c[10].yyyy;
+        R2.w = (_mac).w;
+        oT0.w = (_ilu).w;
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = dot(v3.xyzz.xyz, c[74].xyzz.xyz).xxxx;
+        R5.z = (_mac).z;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = dot(v1, c[70]).xxxx;
+        float4 _ilu = rsqrt(abs(R2.w)).xxxx;
+        oPos.z = (_mac).z;
+        R1.w = (_ilu).w;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = dot(v1, c[68]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = (R2.xyzz * R1.wwww);
+        float4 _ilu = v2.zyxw;
+        R2.xyz = (_mac).xyz;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 11 */
+    {
+        float4 _mac = dot(v1, c[69]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 12 */
+    {
+        float4 _mac = dot(R5.xyzz.xyz, R2.xyzz.xyz).xxxx;
+        R7.x = (_mac).x;
+    }
+
+    /* Instruction 13 */
+    {
+        float4 _mac = dot(v1, c[71]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 14 */
+    {
+        float4 _mac = (R7.xxxx + R7.xxxx);
+        R7.x = (_mac).x;
+    }
+
+    /* Instruction 15 */
+    {
+        float4 _mac = (R12.zzzz * c[24].xxxx + c[24].yyyy);
+        R11.x = (_mac).x;
+    }
+
+    /* Instruction 16 */
+    {
+        float4 _mac = (R5.xyzz * (-R7.xxxx) + R2.xyzz);
+        R0.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 17 */
+    {
+        float4 _mac = (R12.xyzz * c[58].xyzz);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oPos.xyz = (_mac).xyz;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 18 */
+    {
+        float4 _mac = dot(R0.xyzz.xyz, R0.xyzz.xyz).xxxx;
+        R11.w = (_mac).w;
+    }
+
+    /* Instruction 19 */
+    {
+        float4 _mac = min(R11.xxxx, c[24].zzzz);
+        oFog.x = (_mac).x;
+    }
+
+    /* Instruction 20 */
+    {
+        float4 _ilu = rsqrt(abs(R11.w)).xxxx;
+        R11.w = (_ilu).w;
+    }
+
+    /* Instruction 21 */
+    {
+        float4 _mac = (R12.xyzz * R1.xxxx + c[59].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 22 */
+    {
+        float4 _mac = (R0.xyzz * R11.wwww);
+        R11.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 23 */
+    {
+        float4 _mac = (R11.zyxx * c[10].zzzz + c[10].zzzz);
+        oT0.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0xA3467472, 24 insns, inputs 0x000E)
+D3D8 VSH: a program reads v2, which its declaration does not feed; it reads the register's current value
+--- VS HLSL hash 0x943B17FA, 35 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v3 : ATTR3;
+    float4 v5 : ATTR5;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+    float4 v5 = xboxVertexFed[1][1] != 0 ? input.v5 : xboxVertexData[5];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (35 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[64]).xxxx;
+        R0.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = dot(v1, c[65]).xxxx;
+        R0.y = (_mac).y;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[66]).xxxx;
+        R0.z = (_mac).z;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v5.xyzz.xyz, c[64].xyzz.xyz).xxxx;
+        R11.x = (_mac).x;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = dot(v5.xyzz.xyz, c[65].xyzz.xyz).xxxx;
+        R11.y = (_mac).y;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = dot(v5.xyzz.xyz, c[66].xyzz.xyz).xxxx;
+        R11.z = (_mac).z;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = (c[1].xyzz + (-R0.xyzz));
+        R6.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = (c[4].yyzx + (-R0.yyzx));
+        R10.yzw = (_mac).yzw;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = (c[7].yyzx + (-R0.yyzx));
+        R9.xzw = (_mac).xzw;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = dot(R6.xyzz.xyz, R6.xyzz.xyz).xxxx;
+        R9.y = (_mac).y;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = dot(R11.xyzz.xyz, R6.xyzz.xyz).xxxx;
+        R8.x = (_mac).x;
+    }
+
+    /* Instruction 11 */
+    {
+        float4 _mac = dot(R10.wyzz.xyz, R10.wyzz.xyz).xxxx;
+        float4 _ilu = rsqrt(abs(R9.y)).xxxx;
+        R9.y = (_mac).y;
+        R1.z = (_ilu).z;
+    }
+
+    /* Instruction 12 */
+    {
+        float4 _mac = max(R8.xxxx, c[10].xxxx);
+        R8.x = (_mac).x;
+    }
+
+    /* Instruction 13 */
+    {
+        float4 _mac = dot(R11.xyzz.xyz, R10.wyzz.xyz).xxxx;
+        float4 _ilu = rsqrt(abs(R9.y)).xxxx;
+        R8.y = (_mac).y;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 14 */
+    {
+        float4 _mac = dot(v1, c[70]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 15 */
+    {
+        float4 _mac = c[0];
+        R10 = (_mac);
+    }
+
+    /* Instruction 16 */
+    {
+        float4 _mac = (R8.xxxx * R1.zzzz);
+        R8.x = (_mac).x;
+    }
+
+    /* Instruction 17 */
+    {
+        float4 _mac = max(R8.yyyy, c[10].xxxx);
+        R8.y = (_mac).y;
+    }
+
+    /* Instruction 18 */
+    {
+        float4 _mac = dot(R9.wxzz.xyz, R9.wxzz.xyz).xxxx;
+        R9.y = (_mac).y;
+    }
+
+    /* Instruction 19 */
+    {
+        float4 _mac = dot(R11.xyzz.xyz, R9.wxzz.xyz).xxxx;
+        R8.z = (_mac).z;
+    }
+
+    /* Instruction 20 */
+    {
+        float4 _mac = (R8.xxxx * c[2] + R10);
+        R11 = (_mac);
+    }
+
+    /* Instruction 21 */
+    {
+        float4 _mac = (R8.yyyy * R1.xxxx);
+        float4 _ilu = rsqrt(abs(R9.y)).xxxx;
+        R8.x = (_mac).x;
+        R1.z = (_ilu).z;
+    }
+
+    /* Instruction 22 */
+    {
+        float4 _mac = max(R8.zzzz, c[10].xxxx);
+        R8.y = (_mac).y;
+    }
+
+    /* Instruction 23 */
+    {
+        float4 _mac = dot(v1, c[68]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 24 */
+    {
+        float4 _mac = dot(v1, c[69]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 25 */
+    {
+        float4 _mac = dot(v1, c[71]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 26 */
+    {
+        float4 _mac = (R8.xxxx * c[5] + R11);
+        R11 = (_mac);
+    }
+
+    /* Instruction 27 */
+    {
+        float4 _mac = (R8.yyyy * R1.zzzz);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        R8.x = (_mac).x;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 28 */
+    {
+        float4 _mac = (R12.zzzz * c[24].xxxx + c[24].yyyy);
+        R10.x = (_mac).x;
+    }
+
+    /* Instruction 29 */
+    {
+        float4 _mac = (R8.xxxx * c[8] + R11);
+        R11 = (_mac);
+    }
+
+    /* Instruction 30 */
+    {
+        float4 _mac = (R12.xyzz * c[58].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 31 */
+    {
+        float4 _mac = (v3.xyyy * c[11].xyyy);
+        oT0.xy = (_mac).xy;
+    }
+
+    /* Instruction 32 */
+    {
+        float4 _mac = (R11 * c[10].zzzz);
+        oD0 = (_mac);
+    }
+
+    /* Instruction 33 */
+    {
+        float4 _mac = min(R10.xxxx, c[24].zzzz);
+        oFog.x = (_mac).x;
+    }
+
+    /* Instruction 34 */
+    {
+        float4 _mac = (R12.xyzz * R1.xxxx + c[59].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x943B17FA, 35 insns, inputs 0x002A)
+D3D8 VSH: a program reads v5, which its declaration does not feed; it reads the register's current value
+--- VS HLSL hash 0x7E7873A6, 15 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v0 : ATTR0;
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v0 = xboxVertexFed[0][0] != 0 ? input.v0 : xboxVertexData[0];
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (15 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        int _a0 = (int)floor(v0.xxxx.x);
+        a0 = _a0;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = (v3.xyyy * c[11].xyyy);
+        oT0.xy = (_mac).xy;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[a0 + 96]).xxxx;
+        R2.x = (_mac).x;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v1, c[a0 + 97]).xxxx;
+        R2.y = (_mac).y;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = dot(v1, c[a0 + 98]).xxxx;
+        R2.z = (_mac).z;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = dot(v1, c[a0 + 99]).xxxx;
+        R2.w = (_mac).w;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = v2.zyxw;
+        oD0 = (_mac);
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = dot(R2, c[60]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = dot(R2, c[61]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = dot(R2, c[62]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = dot(R2, c[63]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 11 */
+    {
+        float4 _mac = (R12.zzzz * c[24].xxxx + c[24].yyyy);
+        R3.x = (_mac).x;
+    }
+
+    /* Instruction 12 */
+    {
+        float4 _mac = (R12 * c[58]);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oPos.xyz = (_mac).xyz;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 13 */
+    {
+        float4 _mac = min(R3.xxxx, c[24].zzzz);
+        oFog.x = (_mac).x;
+    }
+
+    /* Instruction 14 */
+    {
+        float4 _mac = (R12 * R1.xxxx + c[59]);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x7E7873A6, 15 insns, inputs 0x000F)
+D3D8 VSH: a program reads v0, which its declaration does not feed; it reads the register's current value
+D3D8 VSH: a program reads v2, which its declaration does not feed; it reads the register's current value
+--- VS HLSL hash 0x2A1F6E86, 37 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v0 : ATTR0;
+    float4 v1 : ATTR1;
+    float4 v3 : ATTR3;
+    float4 v5 : ATTR5;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v0 = xboxVertexFed[0][0] != 0 ? input.v0 : xboxVertexData[0];
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+    float4 v5 = xboxVertexFed[1][1] != 0 ? input.v5 : xboxVertexData[5];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (37 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        int _a0 = (int)floor(v0.xxxx.x);
+        a0 = _a0;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = c[0];
+        R11 = (_mac);
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[a0 + 96]).xxxx;
+        R0.x = (_mac).x;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v1, c[a0 + 97]).xxxx;
+        R0.y = (_mac).y;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = dot(v1, c[a0 + 98]).xxxx;
+        R0.z = (_mac).z;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = dot(v5.xyzz.xyz, c[a0 + 96].xyzz.xyz).xxxx;
+        R10.x = (_mac).x;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = dot(v5.xyzz.xyz, c[a0 + 97].xyzz.xyz).xxxx;
+        R10.y = (_mac).y;
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = dot(v5.xyzz.xyz, c[a0 + 98].xyzz.xyz).xxxx;
+        R10.z = (_mac).z;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = dot(v1, c[a0 + 99]).xxxx;
+        R0.w = (_mac).w;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = (c[1].xyzz + (-R0.xyzz));
+        R6.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = (c[4].yyzx + (-R0.yyzx));
+        R9.yzw = (_mac).yzw;
+    }
+
+    /* Instruction 11 */
+    {
+        float4 _mac = (c[7].yyzx + (-R0.yyzx));
+        R8.xzw = (_mac).xzw;
+    }
+
+    /* Instruction 12 */
+    {
+        float4 _mac = dot(R6.xyzz.xyz, R6.xyzz.xyz).xxxx;
+        R9.x = (_mac).x;
+    }
+
+    /* Instruction 13 */
+    {
+        float4 _mac = dot(R10.xyzz.xyz, R6.xyzz.xyz).xxxx;
+        R8.y = (_mac).y;
+    }
+
+    /* Instruction 14 */
+    {
+        float4 _mac = dot(R0, c[62]).xxxx;
+        float4 _ilu = rsqrt(abs(R9.x)).xxxx;
+        oPos.z = (_mac).z;
+        R1.z = (_ilu).z;
+    }
+
+    /* Instruction 15 */
+    {
+        float4 _mac = max(R8.yyyy, c[10].xxxx);
+        R8.y = (_mac).y;
+    }
+
+    /* Instruction 16 */
+    {
+        float4 _mac = dot(R9.wyzz.xyz, R9.wyzz.xyz).xxxx;
+        R9.x = (_mac).x;
+    }
+
+    /* Instruction 17 */
+    {
+        float4 _mac = dot(R10.xyzz.xyz, R9.wyzz.xyz).xxxx;
+        R10.w = (_mac).w;
+    }
+
+    /* Instruction 18 */
+    {
+        float4 _mac = (R8.yyyy * R1.zzzz);
+        float4 _ilu = rsqrt(abs(R9.x)).xxxx;
+        R8.y = (_mac).y;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 19 */
+    {
+        float4 _mac = max(R10.wwww, c[10].xxxx);
+        R10.w = (_mac).w;
+    }
+
+    /* Instruction 20 */
+    {
+        float4 _mac = dot(R8.wxzz.xyz, R8.wxzz.xyz).xxxx;
+        R9.y = (_mac).y;
+    }
+
+    /* Instruction 21 */
+    {
+        float4 _mac = dot(R10.xyzz.xyz, R8.wxzz.xyz).xxxx;
+        R8.x = (_mac).x;
+    }
+
+    /* Instruction 22 */
+    {
+        float4 _mac = (R8.yyyy * c[2] + R11);
+        R11 = (_mac);
+    }
+
+    /* Instruction 23 */
+    {
+        float4 _mac = (R10.wwww * R1.xxxx);
+        float4 _ilu = rsqrt(abs(R9.y)).xxxx;
+        R8.y = (_mac).y;
+        R1.z = (_ilu).z;
+    }
+
+    /* Instruction 24 */
+    {
+        float4 _mac = max(R8.xxxx, c[10].xxxx);
+        R8.x = (_mac).x;
+    }
+
+    /* Instruction 25 */
+    {
+        float4 _mac = dot(R0, c[60]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 26 */
+    {
+        float4 _mac = dot(R0, c[61]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 27 */
+    {
+        float4 _mac = dot(R0, c[63]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 28 */
+    {
+        float4 _mac = (R8.yyyy * c[5] + R11);
+        R11 = (_mac);
+    }
+
+    /* Instruction 29 */
+    {
+        float4 _mac = (R8.xxxx * R1.zzzz);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        R8.x = (_mac).x;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 30 */
+    {
+        float4 _mac = (R12.zzzz * c[24].xxxx + c[24].yyyy);
+        R10.x = (_mac).x;
+    }
+
+    /* Instruction 31 */
+    {
+        float4 _mac = (R8.xxxx * c[8] + R11);
+        R11 = (_mac);
+    }
+
+    /* Instruction 32 */
+    {
+        float4 _mac = (R12.xyzz * c[58].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 33 */
+    {
+        float4 _mac = (v3.xyyy * c[11].xyyy);
+        oT0.xy = (_mac).xy;
+    }
+
+    /* Instruction 34 */
+    {
+        float4 _mac = (R11 * c[10].zzzz);
+        oD0 = (_mac);
+    }
+
+    /* Instruction 35 */
+    {
+        float4 _mac = min(R10.xxxx, c[24].zzzz);
+        oFog.x = (_mac).x;
+    }
+
+    /* Instruction 36 */
+    {
+        float4 _mac = (R12.xyzz * R1.xxxx + c[59].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x2A1F6E86, 37 insns, inputs 0x002B)
+D3D8 VSH: a program reads v0, which its declaration does not feed; it reads the register's current value
+--- VS HLSL hash 0xF243734B, 11 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (11 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[68]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = dot(v1, c[69]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[70]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v1, c[71]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = dot(v3, c[160]).xxxx;
+        oT0.x = (_mac).x;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = dot(v3, c[161]).xxxx;
+        oT0.y = (_mac).y;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = v2.zyxw;
+        oD0 = (_mac);
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = (R12.zzzz * c[24].xxxx + c[24].yyyy);
+        R2.x = (_mac).x;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = (R12 * c[58]);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oPos.xyz = (_mac).xyz;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = min(R2.xxxx, c[24].zzzz);
+        oFog.x = (_mac).x;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = (R12 * R1.xxxx + c[59]);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0xF243734B, 11 insns, inputs 0x000E)
+--- VS HLSL hash 0x31F88118, 39 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v0 : ATTR0;
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v0 = xboxVertexFed[0][0] != 0 ? input.v0 : xboxVertexData[0];
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (39 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[66]).xxxx;
+        R0.z = (_mac).z;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = v3.yyyy;
+        R11.z = (_mac).z;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = (v3.yyyy * c[13].xxxx);
+        R11.x = (_mac).x;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = R0.zzzz;
+        float4 _ilu = v2.zyxw;
+        R11.w = (_mac).w;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = c[10].yyyy;
+        R11.y = (_mac).y;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = (v3.xxxx * c[36].wwww + c[36].yyyy);
+        R2.x = (_mac).x;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = dot(R11.zxwy, c[63]).xxxx;
+        R2.w = (_mac).w;
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = dot(R11.zxwy, c[60]).xxxx;
+        float4 _ilu = exp2(R2.x).xxxx;
+        R2.x = (_mac).x;
+        R1.y = (_ilu).y;
+    }
+
+    /* Instruction 8 */
+    {
+        int _a0 = (int)floor(v0.xxxx.x);
+        float4 _ilu = (1.0 / R2.w).xxxx;
+        a0 = _a0;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = (R1.yyyy * c[36].zzzz + (-c[36].xxxx));
+        R2.y = (_mac).y;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = (R2.xxxx * R1.xxxx);
+        R2.x = (_mac).x;
+    }
+
+    /* Instruction 11 */
+    {
+        float4 _mac = float4(1.0, R2.yyyy.y * R2.yyyy.y, R2.yyyy.z, R2.yyyy.w);
+        R3.xy = (_mac).xy;
+    }
+
+    /* Instruction 12 */
+    {
+        float4 _mac = (R3.yyyy * R3.yyyy);
+        float4 _ilu = (1.0 / R2.x).xxxx;
+        R3.z = (_mac).z;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 13 */
+    {
+        float4 _mac = dot(v1, c[64]).xxxx;
+        R11.x = (_mac).x;
+    }
+
+    /* Instruction 14 */
+    {
+        float4 _mac = (R1.xxxx * c[13].yyyy);
+        R11.w = (_mac).w;
+    }
+
+    /* Instruction 15 */
+    {
+        float4 _mac = (R3.yyyy * R3.zzzz);
+        R3.w = (_mac).w;
+    }
+
+    /* Instruction 16 */
+    {
+        float4 _mac = (R11.zzzz * R11.wwww);
+        R11.w = (_mac).w;
+    }
+
+    /* Instruction 17 */
+    {
+        float4 _mac = min(R11.zzzz, R11.wwww);
+        R11.z = (_mac).z;
+    }
+
+    /* Instruction 18 */
+    {
+        float4 _mac = (R3 * R2.yyyy);
+        R2 = (_mac);
+    }
+
+    /* Instruction 19 */
+    {
+        float4 _mac = (R11.zzzz * c[13].xxxx);
+        R11.w = (_mac).w;
+    }
+
+    /* Instruction 20 */
+    {
+        float4 _mac = dot(R2, c[38]).xxxx;
+        R2.y = (_mac).y;
+    }
+
+    /* Instruction 21 */
+    {
+        float4 _mac = dot(R3, c[37]).xxxx;
+        R2.x = (_mac).x;
+    }
+
+    /* Instruction 22 */
+    {
+        float4 _mac = dot(v1, c[65]).xxxx;
+        R11.y = (_mac).y;
+    }
+
+    /* Instruction 23 */
+    {
+        float4 _mac = (R2.xyxy * R11.zwwz);
+        R4 = (_mac);
+    }
+
+    /* Instruction 24 */
+    {
+        float4 _mac = (R4 * c[a0 + 96]);
+        R5 = (_mac);
+    }
+
+    /* Instruction 25 */
+    {
+        float4 _mac = (R5.xxxx + R5.yyyy);
+        R3.x = (_mac).x;
+    }
+
+    /* Instruction 26 */
+    {
+        float4 _mac = (R5.zzzz + R5.wwww);
+        R3.y = (_mac).y;
+    }
+
+    /* Instruction 27 */
+    {
+        float4 _mac = dot(v1, c[67]).xxxx;
+        R0.w = (_mac).w;
+    }
+
+    /* Instruction 28 */
+    {
+        float4 _mac = (R11.xyyy + R3.xyyy);
+        R0.xy = (_mac).xy;
+    }
+
+    /* Instruction 29 */
+    {
+        float4 _mac = c[a0 + 100].xyyy;
+        R4.xy = (_mac).xy;
+    }
+
+    /* Instruction 30 */
+    {
+        float4 _mac = dot(R0, c[62]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 31 */
+    {
+        float4 _mac = dot(R0, c[60]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 32 */
+    {
+        float4 _mac = (R12.zzzz + c[13].wwww);
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 33 */
+    {
+        float4 _mac = dot(R0, c[61]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 34 */
+    {
+        float4 _mac = dot(R0, c[63]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 35 */
+    {
+        float4 _mac = max(R12.zzzz, c[13].zzzz);
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 36 */
+    {
+        float4 _mac = (R12.xyzz * c[58].xyzz);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oPos.xyz = (_mac).xyz;
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 37 */
+    {
+        float4 _mac = (R4.xyyy * c[11].xyyy);
+        oT0.xy = (_mac).xy;
+    }
+
+    /* Instruction 38 */
+    {
+        float4 _mac = (R12.xyzz * R1.xxxx + c[59].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x31F88118, 39 insns, inputs 0x000F)
+--- VS HLSL hash 0x89E4D9F9, 13 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+    float4 v4 : ATTR4;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+    float4 v4 = xboxVertexFed[1][0] != 0 ? input.v4 : xboxVertexData[4];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (13 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[64]).xxxx;
+        R0.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = dot(v1, c[65]).xxxx;
+        R0.y = (_mac).y;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[66]).xxxx;
+        R11.z = (_mac).z;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v1, c[67]).xxxx;
+        R11.w = (_mac).w;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = (R0.xyyy + v4.xyyy);
+        R11.xy = (_mac).xy;
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _ilu = v2.zyxw;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = dot(R11, c[60]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = dot(R11, c[61]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = dot(R11, c[62]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = dot(R11, c[63]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = (R12.xyzz * c[58].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 11 */
+    {
+        float4 _mac = (v3 * c[11]);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oT0 = (_mac);
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 12 */
+    {
+        float4 _mac = (R12.xyzz * R1.xxxx + c[59].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x89E4D9F9, 13 insns, inputs 0x001E)
+--- VS HLSL hash 0xC319D189, 12 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (12 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = dot(v1, c[64]).xxxx;
+        R0.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = dot(v1, c[65]).xxxx;
+        R0.y = (_mac).y;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = dot(v1, c[66]).xxxx;
+        R0.z = (_mac).z;
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = dot(v1, c[67]).xxxx;
+        R0.w = (_mac).w;
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _ilu = v2.zyxw;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = dot(R0, c[60]).xxxx;
+        oPos.x = (_mac).x;
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = dot(R0, c[61]).xxxx;
+        oPos.y = (_mac).y;
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = dot(R0, c[62]).xxxx;
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 8 */
+    {
+        float4 _mac = dot(R0, c[63]).xxxx;
+        oPos.w = (_mac).w;
+    }
+
+    /* Instruction 9 */
+    {
+        float4 _mac = (R12.xyzz * c[58].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    /* Instruction 10 */
+    {
+        float4 _mac = (v3 * c[11]);
+        float4 _ilu = (((1.0 / R12.w) >= 0.0 ? 1.0 : -1.0) * clamp(abs(1.0 / R12.w), 5.42101e-20, 1.8446744e+19)).xxxx;
+        oT0 = (_mac);
+        R1.x = (_ilu).x;
+    }
+
+    /* Instruction 11 */
+    {
+        float4 _mac = (R12.xyzz * R1.xxxx + c[59].xyzz);
+        oPos.xyz = (_mac).xyz;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0xC319D189, 12 insns, inputs 0x000E)
+--- VS HLSL hash 0x81F72C58, 8 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+    float4 v8 : ATTR8;
+    float4 v9 : ATTR9;
+    float4 v10 : ATTR10;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+    float4 v8 = xboxVertexFed[2][0] != 0 ? input.v8 : xboxVertexData[8];
+    float4 v9 = xboxVertexFed[2][1] != 0 ? input.v9 : xboxVertexData[9];
+    float4 v10 = xboxVertexFed[2][2] != 0 ? input.v10 : xboxVertexData[10];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (8 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = v1.xyyw;
+        oPos.xyw = (_mac).xyw;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _mac = (v1.zzzz * c[58]);
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = v2.zyxw;
+        oD0 = (_mac);
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = (v3 * c[11]);
+        oT0 = (_mac);
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = (v8 * c[11]);
+        oT1 = (_mac);
+    }
+
+    /* Instruction 5 */
+    {
+        float4 _mac = (v9 * c[11]);
+        oT2 = (_mac);
+    }
+
+    /* Instruction 6 */
+    {
+        float4 _mac = (v10 * c[11]);
+        oT3 = (_mac);
+    }
+
+    /* Instruction 7 */
+    {
+        float4 _mac = (R12.zzzz + c[59]);
+        oPos.z = (_mac).z;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x81F72C58, 8 insns, inputs 0x070E)
+--- VS HLSL hash 0x4176C0F8, 3 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (3 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _ilu = v1;
+        oPos = (_ilu);
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _ilu = v2.wxyz;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _mac = (v3 * c[11]);
+        oT0 = (_mac);
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0x4176C0F8, 3 insns, inputs 0x000E)
+--- VS HLSL hash 0xFE4E87B3, 2 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (2 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _ilu = v1;
+        oPos = (_ilu);
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _ilu = v2.wxyz;
+        oD0 = (_ilu);
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0xFE4E87B3, 2 insns, inputs 0x0006)
+D3D8 VSH: a program reads v0, which its declaration does not feed; it reads the register's current value
+D3D8 VSH: a program reads v2, which its declaration does not feed; it reads the register's current value
+--- VS HLSL hash 0xCF85BF97, 5 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+    float4 v3 : ATTR3;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+    float4 v3 = xboxVertexFed[0][3] != 0 ? input.v3 : xboxVertexData[3];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (5 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = (v1.zzzz * c[58].zzzz);
+        oPos.z = (_mac).z;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _ilu = v1.xyyw;
+        oPos.xyw = (_ilu).xyw;
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _ilu = v2.zyxw;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = (v3 * c[11]);
+        oT0 = (_mac);
+    }
+
+    /* Instruction 4 */
+    {
+        float4 _mac = (R12.zzzz + c[59].zzzz);
+        oPos.z = (_mac).z;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0xCF85BF97, 5 insns, inputs 0x000E)
+--- VS HLSL hash 0xD756F822, 4 instructions ---
+/* Auto-generated NV2A vertex shader */
+
+cbuffer VSH_Constants : register(b1) {
+    float4 c[192];
+};
+
+cbuffer VSH_Screenspace : register(b2) {
+    float4 xboxScreenspaceScale;
+    float4 xboxScreenspaceOffset;
+    float4 xboxScreenspaceEnable;
+};
+
+cbuffer VSH_VertexData : register(b3) {
+    float4 xboxVertexData[16];
+    float4 xboxVertexFed[4];
+};
+
+struct VS_IN {
+    float4 v1 : ATTR1;
+    float4 v2 : ATTR2;
+};
+
+struct VS_OUT {
+    float4 oPos : SV_POSITION;
+    float4 oD0  : COLOR0;
+    float4 oD1  : COLOR1;
+    float4 oT0  : TEXCOORD0;
+    float4 oT1  : TEXCOORD1;
+    float4 oT2  : TEXCOORD2;
+    float4 oT3  : TEXCOORD3;
+    float  oFog : TEXCOORD4;
+    float4 oViewPos : TEXCOORD5;
+    float  oPts : PSIZE;
+    float4 oB0  : TEXCOORD6;
+    float4 oB1  : TEXCOORD7;
+};
+
+VS_OUT main(VS_IN input) {
+    /* Temporary registers */
+    float4 R0 = float4(0,0,0,0);
+    float4 R1 = float4(0,0,0,0);
+    float4 R2 = float4(0,0,0,0);
+    float4 R3 = float4(0,0,0,0);
+    float4 R4 = float4(0,0,0,0);
+    float4 R5 = float4(0,0,0,0);
+    float4 R6 = float4(0,0,0,0);
+    float4 R7 = float4(0,0,0,0);
+    float4 R8 = float4(0,0,0,0);
+    float4 R9 = float4(0,0,0,0);
+    float4 R10 = float4(0,0,0,0);
+    float4 R11 = float4(0,0,0,0);
+    float4 R12 = float4(0,0,0,0);
+    int a0 = 0;
+
+    /* Input registers */
+    float4 v1 = xboxVertexFed[0][1] != 0 ? input.v1 : xboxVertexData[1];
+    float4 v2 = xboxVertexFed[0][2] != 0 ? input.v2 : xboxVertexData[2];
+
+    /* Output registers */
+    float4 oPos = float4(0,0,0,1);
+    float4 oD0  = float4(0,0,0,1);
+    float4 oD1  = float4(0,0,0,1);
+    float4 oFog = float4(1,1,1,1);
+    float4 oPts = float4(0,0,0,0);
+    float4 oB0  = float4(0,0,0,1);
+    float4 oB1  = float4(0,0,0,1);
+    float4 oT0  = float4(0,0,0,1);
+    float4 oT1  = float4(0,0,0,1);
+    float4 oT2  = float4(0,0,0,1);
+    float4 oT3  = float4(0,0,0,1);
+
+    /* R12 is aliased to oPos */
+    #define R12 oPos
+
+    /* --- Program body (4 instructions) --- */
+
+    /* Instruction 0 */
+    {
+        float4 _mac = (v1.zzzz * c[24].xxxx + c[24].yyyy);
+        R2.x = (_mac).x;
+    }
+
+    /* Instruction 1 */
+    {
+        float4 _ilu = v1;
+        oPos = (_ilu);
+    }
+
+    /* Instruction 2 */
+    {
+        float4 _ilu = v2.wxyz;
+        oD0 = (_ilu);
+    }
+
+    /* Instruction 3 */
+    {
+        float4 _mac = min(R2.xxxx, c[24].zzzz);
+        oFog.x = (_mac).x;
+    }
+
+    #undef R12
+
+    /* Undo the Xbox screen-space transform */
+    if (xboxScreenspaceEnable.x != 0) {
+        oPos -= xboxScreenspaceOffset;
+        oPos /= xboxScreenspaceScale;
+        if (oPos.w == 0) oPos.w = 1;
+        oPos.xyz *= oPos.w;
+    }
+
+    /* Write outputs */
+    VS_OUT o;
+    o.oPos = oPos;
+    o.oD0  = saturate(oD0);
+    o.oD1  = saturate(oD1);
+    o.oT0  = oT0;
+    o.oT1  = oT1;
+    o.oT2  = oT2;
+    o.oT3  = oT3;
+    o.oFog = oFog.x;
+    o.oViewPos = float4(0, 0, -oFog.x, 1);
+    o.oPts = oPts.x;
+    o.oB0  = saturate(oB0);
+    o.oB1  = saturate(oB1);
+    return o;
+}
+
+--- End VS HLSL ---
+D3D8 VSH: Compiled shader (hash 0xD756F822, 4 insns, inputs 0x0006)
+[replay] wrote rep/y_000.bmp
+[replay] loop 0 executed: frame_start 1 clear 2 render_state 1448 texture_stage_state 2952 transform 10 viewport 5 set_texture 201 set_vertex_shader 150 draw_up 130 draw_indexed_up 211 texture 63 vs_create 21 vs_declaration 170 vs_constants 783 vs_screenspace 17 ps_token 342 depth_surface 1 set_render_target 9 vs_vertex_data 16 scissors 29 material 1 light 8 light_enable 8
+[replay] loop 0: 0 host calls failed, 0 malformed chunks, 0 unmapped handles, 0 unknown chunks

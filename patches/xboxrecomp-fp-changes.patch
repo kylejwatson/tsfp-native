@@ -1,3 +1,49 @@
+diff --git a/src/d3d/d3d8_combiners.c b/src/d3d/d3d8_combiners.c
+index a795bfd..2879c0c 100644
+--- a/src/d3d/d3d8_combiners.c
++++ b/src/d3d/d3d8_combiners.c
+@@ -338,6 +338,18 @@ void d3d8_combiners_from_render_states(const DWORD *rs,
+          * zero, zero, zero, zero, r0`: colour D = r0, alpha G = r0.a. Do the
+          * same. A title that wants black writes ZERO into D explicitly, which
+          * is a different word from "nothing written". */
++        if (getenv("RECOMP_D3D8_PS_DUMP")) {
++            static DWORD seen[32];
++            static int nseen;
++            int k;
++            for (k = 0; k < nseen && seen[k] != (abcd ^ (efg * 31u)); k++)
++                ;
++            if (k == nseen && nseen < 32) {
++                seen[nseen++] = abcd ^ (efg * 31u);
++                fprintf(stderr, "NV2A combiners: final combiner words ABCD 0x%08lX EFG 0x%08lX\n",
++                        (unsigned long)abcd, (unsigned long)efg);
++            }
++        }
+         if (abcd == 0 && efg == 0) {
+             abcd = 0x0000000Cu;              /* D = R0 */
+             efg  = 0x00001C00u;              /* G = R0 alpha */
+@@ -642,7 +654,21 @@ int d3d8_combiners_generate_hlsl(const NV2ACombinerState *state,
+      * lerp in the final combiner either way, so taking the interpolated value
+      * regardless let a vertex stage that writes no fog blank the whole draw to
+      * the fog colour -- Burnout 2's menus came out black that way. */
+-    EMIT("    float4 r_fog  = float4(fog_color.rgb, fog_enable ? input.fog : 1.0);\n");
++    /* "No fog" depends on which way round the title wrote the lerp. The XDK's
++     * own form is A = fog alpha, B = r0, C = fog colour: the factor is how
++     * much of the shaded colour survives, and 1 is no fog. TimeSplitters:
++     * Future Perfect writes the opposite, A = fog alpha, B = fog colour,
++     * C = r0 (final combiner word 0x13030C00): the factor is how much fog
++     * there is, and 1 painted its whole world in the fog colour. So with fog
++     * disabled the factor is whichever value leaves the shaded colour. */
++    {
++        const NV2ACombinerInput *fb = &state->final_input[1], *fc = &state->final_input[2];
++        int fog_is_amount = fb->reg == NV2A_REG_FOG && !fb->alpha_rep &&
++                            fc->reg != NV2A_REG_FOG;
++
++        EMIT("    float4 r_fog  = float4(fog_color.rgb, fog_enable ? input.fog : %s);\n",
++             fog_is_amount ? "0.0" : "1.0");
++    }
+ 
+     /* Vertex colors: Xbox D3DCOLOR is BGRA in memory, the vertex shader
+      * should have already swizzled to RGBA. */
 diff --git a/src/hle/CMakeLists.txt b/src/hle/CMakeLists.txt
 index 1bf284a..d8edfda 100644
 --- a/src/hle/CMakeLists.txt
