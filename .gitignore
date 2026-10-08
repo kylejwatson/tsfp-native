@@ -62,3 +62,8 @@ xbox_kernel.log
 d[0-9]*/
 d[0-9]*.log
 caps/
+adump*/
+*.wav
+rep/
+caps2/
+level_seq.txt

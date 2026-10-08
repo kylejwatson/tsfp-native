@@ -159,6 +159,43 @@ index 1bf284a..d8edfda 100644
      hle_d3d8_record.c
      d3d8_capture.c
      hle_dsound.c
+diff --git a/src/hle/audio_output_xaudio2.cpp b/src/hle/audio_output_xaudio2.cpp
+index d7b3440..5abdae5 100644
+--- a/src/hle/audio_output_xaudio2.cpp
++++ b/src/hle/audio_output_xaudio2.cpp
+@@ -295,6 +295,32 @@ extern "C" int recomp_audio_output_submit(
+         owned.capacity = bytes;
+     }
+     std::memcpy(owned.data, pcm, bytes);
++    /* RECOMP_AUDIO_DUMP=<dir>: append every buffer a voice is given to
++     * <dir>/slotNNN.raw, and its format and first-submit time to slotNNN.txt,
++     * so a sound that plays at the wrong speed can be measured -- seconds of
++     * audio against seconds of wall clock -- instead of guessed at by ear. */
++    {
++        static const char *dir = std::getenv("RECOMP_AUDIO_DUMP");
++        static std::FILE *files[kVoiceCount];
++        if (dir && *dir) {
++            if (!files[slot]) {
++                char path[512];
++                std::snprintf(path, sizeof path, "%s/slot%03u.raw", dir, slot);
++                files[slot] = std::fopen(path, "wb");
++                std::snprintf(path, sizeof path, "%s/slot%03u.txt", dir, slot);
++                if (std::FILE *info = std::fopen(path, "w")) {
++                    std::fprintf(info, "rate %u channels %u bits %u first_tick_ms %lu\n",
++                                 sample_rate, channels, bits_per_sample,
++                                 static_cast<unsigned long>(GetTickCount()));
++                    std::fclose(info);
++                }
++            }
++            if (files[slot]) {
++                std::fwrite(pcm, 1, bytes, files[slot]);
++                std::fflush(files[slot]);
++            }
++        }
++    }
+     XAUDIO2_BUFFER buffer{};
+     buffer.AudioBytes = bytes;
+     buffer.pAudioData = owned.data;
 diff --git a/src/hle/hle_d3d8.c b/src/hle/hle_d3d8.c
 index c36f128..2b37547 100644
 --- a/src/hle/hle_d3d8.c
@@ -578,6 +615,85 @@ index c4d8f9c..e5e6ef0 100644
              hle_d3d8_shadow_set_first_vertex(g_base_vertex);
              hle_d3d8_shadow_draw_indexed(xpt, count, idx, verts, g_stream0_stride, 1);
          }
+diff --git a/src/hle/hle_dsound_stream.c b/src/hle/hle_dsound_stream.c
+index ee775d2..554e02e 100644
+--- a/src/hle/hle_dsound_stream.c
++++ b/src/hle/hle_dsound_stream.c
+@@ -99,6 +99,7 @@ typedef struct Stream {
+     uint32_t iface;                  /* IDirectSoundStream the title holds */
+     uint32_t object;                 /* CDirectSoundStream, bound at first use */
+     uint32_t tag, channels, rate, bits, align;
++    uint32_t created_rate;           /* the rate in the creation format; SetFrequency(0) restores it */
+     uint32_t max_packets;
+     uint32_t callback, context;      /* LPFNXMEDIAOBJECTCALLBACK, its context */
+     int      output;                 /* the host can play this format */
+@@ -521,6 +522,15 @@ static void record_stream(uint32_t iface, uint32_t desc)
+     s->tag         = HLE_MEM32(wfx) & 0xFFFFu;
+     s->channels    = HLE_MEM32(wfx) >> 16;
+     s->rate        = HLE_MEM32(wfx + 4u);
++    s->created_rate = s->rate;
++    /* RECOMP_DSOUND_STREAM_RATE=<Hz> plays every stream at that rate instead:
++     * a listening test for "the music is too fast or too slow", since the
++     * rate the title declares is the only one this file can see. */
++    {
++        const char *forced = getenv("RECOMP_DSOUND_STREAM_RATE");
++        if (forced && atoi(forced) >= 1000 && atoi(forced) <= 200000)
++            s->rate = (uint32_t)atoi(forced);
++    }
+     s->align       = HLE_MEM32(wfx + 12u) & 0xFFFFu;
+     s->bits        = HLE_MEM32(wfx + 12u) >> 16;
+     s->max_packets = max_packets && max_packets < MAX_PACKETS ? max_packets : MAX_PACKETS;
+@@ -543,6 +553,7 @@ static void record_stream(uint32_t iface, uint32_t desc)
+ HLE_ORIGINAL(DirectSoundCreateStream);
+ HLE_ORIGINAL(CDirectSound_CreateSoundStream);
+ HLE_ORIGINAL(CDirectSoundStream_SetVolume);
++HLE_ORIGINAL(CDirectSoundStream_SetFrequency);
+ 
+ /* HRESULT DirectSoundCreateStream(LPCDSSTREAMDESC pdssd,
+  *     LPDIRECTSOUNDSTREAM *ppStream) */
+@@ -772,3 +783,42 @@ HLE_EXPORT(CDirectSoundStream_SetVolume)
+     }
+     HLE_RETURN(DS_OK);
+ }
++
++/* HRESULT CDirectSoundStream::SetFrequency(this, DWORD dwFrequency), in Hz;
++ * 0 means the format's own rate.
++ *
++ * A title may create a stream with one format and then retune it: the rate in
++ * the DSSTREAMDESC is only where it starts. Ignoring this played such a stream
++ * at its creation rate -- too fast or too slow, and completing packets on the
++ * same wrong clock, so the title kept feeding it at the wrong speed and nothing
++ * else looked amiss. The new rate drives both the host voice and the clock. */
++HLE_EXPORT(CDirectSoundStream_SetFrequency)
++{
++    uint32_t object = HLE_ARG(0), frequency = HLE_ARG(1);
++    static int said;
++    Stream *s;
++
++    lock();
++    s = find_by_object(object);
++    if (said < 16) {
++        said++;
++        fprintf(stderr, "[DSOUND] stream SetFrequency(%u) on %s (created at %u Hz)\n",
++                frequency, s ? "a modelled stream" : "an unknown object",
++                s ? s->created_rate : 0u);
++    }
++    if (s) {
++        uint32_t rate = frequency ? frequency : s->created_rate;
++        if (rate >= 1000u && rate <= 200000u && rate != s->rate) {
++            uint64_t now = now_ms();
++            pump(s, now);                /* settle the clock at the old rate */
++            s->rate = rate;
++            refeed(s, now);              /* the voice restarts at the new one */
++        }
++    }
++    unlock();
++    if (hle_original_CDirectSoundStream_SetFrequency) {
++        HLE_CALL_ORIGINAL(CDirectSoundStream_SetFrequency);
++        return;
++    }
++    HLE_RETURN(DS_OK);
++}
 diff --git a/src/input/input_bindings.c b/src/input/input_bindings.c
 index ef22573..7e9a523 100644
 --- a/src/input/input_bindings.c
