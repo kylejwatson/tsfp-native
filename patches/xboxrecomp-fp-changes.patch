@@ -1,5 +1,5 @@
 diff --git a/src/d3d/d3d8_combiners.c b/src/d3d/d3d8_combiners.c
-index a795bfd..2879c0c 100644
+index a795bfd..70e96b6 100644
 --- a/src/d3d/d3d8_combiners.c
 +++ b/src/d3d/d3d8_combiners.c
 @@ -338,6 +338,18 @@ void d3d8_combiners_from_render_states(const DWORD *rs,
@@ -44,6 +44,16 @@ index a795bfd..2879c0c 100644
  
      /* Vertex colors: Xbox D3DCOLOR is BGRA in memory, the vertex shader
       * should have already swizzled to RGBA. */
+@@ -932,6 +958,9 @@ int d3d8_combiners_generate_hlsl(const NV2ACombinerState *state,
+         } else if (show && strcmp(show, "tc0raw") == 0) { /* coordinate size */
+             EMIT("    result.rgb = saturate(abs(input.tc0.xyz) / 16.0);\n");
+             EMIT("    result.a = 1.0;\n");
++        } else if (show && strcmp(show, "fograw") == 0) { /* oFog / 16, unclamped source */
++            EMIT("    result.rgb = float3(saturate(input.fog / 16.0), saturate(-input.fog / 16.0), frac(input.fog));\n");
++            EMIT("    result.a = 1.0;\n");
+         } else if (show && strcmp(show, "fogon") == 0) {  /* fog enabled: white */
+             EMIT("    result.rgb = fog_enable ? 1.0 : 0.0;\n");
+             EMIT("    result.a = 1.0;\n");
 diff --git a/src/d3d/d3d8_resources.c b/src/d3d/d3d8_resources.c
 index cef025d..c6bed20 100644
 --- a/src/d3d/d3d8_resources.c
@@ -147,6 +157,135 @@ index cef025d..c6bed20 100644
              }
          }
          break;
+diff --git a/src/d3d/d3d8_vsh.c b/src/d3d/d3d8_vsh.c
+index eb076ca..ffa33e0 100644
+--- a/src/d3d/d3d8_vsh.c
++++ b/src/d3d/d3d8_vsh.c
+@@ -523,18 +523,25 @@ static void emit_ilu_op(StrBuf *sb, const NV2AVshInstruction *inst)
+         break;
+ 
+     case NV2A_VSH_ILU_EXP:
+-        /* dst = exp2(C.x).xxxx */
+-        sb_append(&expr, "exp2(");
++        /* The NV2A's EXP is D3D's expp, four different results, not one:
++         *   x = 2^floor(s), y = s - floor(s), z = 2^s, w = 1.
++         * Programs use .y as a cheap frac(): TimeSplitters: Future Perfect
++         * turns a particle's spin into an angle in [-pi, pi) that way before
++         * a Taylor sin/cos, and with 2^s in .y every particle's rotation
++         * blew up into a screen-filling quad. */
++        sb_append(&expr, "nv2a_expp(");
+         emit_source(&expr, &inst->ilu_src, 1);
+-        sb_append(&expr, ").xxxx");
++        sb_append(&expr, ")");
+         break;
+ 
+     case NV2A_VSH_ILU_LOG: {
+-        /* dst = log2(abs(C.x)).xxxx
+-         * Guard against log2(0) which is -inf on NV2A -> clamp to large negative */
+-        sb_append(&expr, "log2(max(abs(");
++        /* D3D's logp, likewise:
++         *   x = floor(log2|s|), y = |s| / 2^x (the mantissa, in [1, 2)),
++         *   z = log2|s|, w = 1.
++         * log2(0) is -inf on the NV2A; it is clamped to a large negative. */
++        sb_append(&expr, "nv2a_logp(");
+         emit_source(&expr, &inst->ilu_src, 1);
+-        sb_append(&expr, "), 1.175494e-38)).xxxx");
++        sb_append(&expr, ")");
+         break;
+     }
+ 
+@@ -622,6 +629,16 @@ int d3d8_vsh_generate_hlsl(const NV2AVshProgram *program,
+         "    float4 xboxVertexData[%d];\n"
+         "    float4 xboxVertexFed[4];\n"
+         "};\n"
++        "\n"
++        "float4 nv2a_expp(float s) {\n"
++        "    float f = floor(s);\n"
++        "    return float4(exp2(f), s - f, exp2(s), 1.0);\n"
++        "}\n"
++        "float4 nv2a_logp(float s) {\n"
++        "    float a = max(abs(s), 1.175494e-38);\n"
++        "    float e = floor(log2(a));\n"
++        "    return float4(e, a / exp2(e), log2(a), 1.0);\n"
++        "}\n"
+         "\n", NV2A_VS_MAX_CONSTANTS, NV2A_VS_MAX_INPUTS);
+ 
+     /* Input structure - only declare used inputs */
+@@ -638,16 +655,23 @@ int d3d8_vsh_generate_hlsl(const NV2AVshProgram *program,
+      * ask for (d3d8_shaders.c and d3d8_combiners.c, PS_IN): fog at TEXCOORD4
+      * and a view-space position for table fog at TEXCOORD5. An earlier
+      * version wrote fog to FOG, which no pixel shader here reads, so fog
+-     * never reached them. The order is only for reading. */
++     * never reached them. The order is only for reading.
++     *
++     * The texture coordinates are float3, as both pixel shaders declare them:
++     * the compiler packs the float fog into TEXCOORD3's register (.w) when
++     * TEXCOORD3 is a float3, and the two sides must pack alike. With float4
++     * here every program's fog was read from oT3.w instead -- a constant,
++     * so TimeSplitters: Future Perfect's canyon came out entirely fog
++     * colour. */
+     sb_append(&sb,
+         "struct VS_OUT {\n"
+         "    float4 oPos : SV_POSITION;\n"
+         "    float4 oD0  : COLOR0;\n"
+         "    float4 oD1  : COLOR1;\n"
+-        "    float4 oT0  : TEXCOORD0;\n"
+-        "    float4 oT1  : TEXCOORD1;\n"
+-        "    float4 oT2  : TEXCOORD2;\n"
+-        "    float4 oT3  : TEXCOORD3;\n"
++        "    float3 oT0  : TEXCOORD0;\n"
++        "    float3 oT1  : TEXCOORD1;\n"
++        "    float3 oT2  : TEXCOORD2;\n"
++        "    float3 oT3  : TEXCOORD3;\n"
+         "    float  oFog : TEXCOORD4;\n"
+         "    float4 oViewPos : TEXCOORD5;\n"
+         "    float  oPts : PSIZE;\n"
+@@ -764,10 +788,10 @@ int d3d8_vsh_generate_hlsl(const NV2AVshProgram *program,
+         "    o.oPos = oPos;\n"
+         "    o.oD0  = saturate(oD0);\n"  /* Colors clamped to [0,1] */
+         "    o.oD1  = saturate(oD1);\n"
+-        "    o.oT0  = oT0;\n"
+-        "    o.oT1  = oT1;\n"
+-        "    o.oT2  = oT2;\n"
+-        "    o.oT3  = oT3;\n"
++        "    o.oT0  = oT0.xyz;\n"
++        "    o.oT1  = oT1.xyz;\n"
++        "    o.oT2  = oT2.xyz;\n"
++        "    o.oT3  = oT3.xyz;\n"
+         "    o.oFog = oFog.x;\n"
+         /* Table fog reads -viewpos.z (or its length, for range fog) as the
+          * distance; on the Xbox that distance is the program's oFog. */
+@@ -1537,6 +1561,15 @@ BOOL d3d8_vsh_get_slot(int slot, DWORD *handle, const DWORD **microcode,
+     return TRUE;
+ }
+ 
++uint32_t d3d8_vsh_slot_hash(DWORD handle)
++{
++    int slot = (int)(handle - 0x10000);
++
++    if (slot < 0 || slot >= NV2A_VS_MAX_SLOTS || !g_vsh_slots[slot].in_use)
++        return 0u;
++    return g_vsh_slots[slot].hash;
++}
++
+ BOOL d3d8_vsh_is_programmable(DWORD handle)
+ {
+     return (handle >= 0x10000) ? TRUE : FALSE;
+diff --git a/src/d3d/d3d8_vsh.h b/src/d3d/d3d8_vsh.h
+index 8a9a88d..1338dee 100644
+--- a/src/d3d/d3d8_vsh.h
++++ b/src/d3d/d3d8_vsh.h
+@@ -169,6 +169,10 @@ const float *d3d8_vsh_constants(void);
+  */
+ BOOL d3d8_vsh_is_programmable(DWORD handle);
+ 
++/** The microcode hash of the program in a handle's slot (the one the
++ *  "Compiled shader (hash ...)" line names), 0 if none. For diagnostics. */
++uint32_t d3d8_vsh_slot_hash(DWORD handle);
++
+ /**
+  * Give a program the vertex layout its declaration describes. Registers the
+  * program reads are bound at these formats and offsets instead of being
 diff --git a/src/hle/CMakeLists.txt b/src/hle/CMakeLists.txt
 index 1bf284a..d8edfda 100644
 --- a/src/hle/CMakeLists.txt
@@ -197,10 +336,10 @@ index d7b3440..5abdae5 100644
      buffer.AudioBytes = bytes;
      buffer.pAudioData = owned.data;
 diff --git a/src/hle/hle_d3d8.c b/src/hle/hle_d3d8.c
-index c36f128..2b37547 100644
+index c36f128..b84ef7f 100644
 --- a/src/hle/hle_d3d8.c
 +++ b/src/hle/hle_d3d8.c
-@@ -623,6 +623,12 @@ struct shadow_program {
+@@ -623,6 +623,24 @@ struct shadow_program {
  #define NO_FIRST_VERTEX 0xFFFFFFFFu
  static uint32_t g_draw_first = NO_FIRST_VERTEX;
  void hle_d3d8_shadow_set_first_vertex(uint32_t first) { g_draw_first = first; }
@@ -209,11 +348,23 @@ index c36f128..2b37547 100644
 + * hle_d3d8_push.c, which lays the title's own arrays out to match its
 + * declaration; 0 when the selected shader is not a program. */
 +uint32_t hle_d3d8_shadow_program_object(void);
++/* hle_d3d8_push.c. A draw reaches the host only after the push buffer up to it
++ * has been read: the XDK's inlined constant setters and the title's own
++ * BeginPush blocks write vertex constants there and nowhere else, and a draw
++ * that ran ahead of the walk was transformed by the previous object's
++ * matrices. */
++void hle_d3d8_push_sync(void);
++void hle_d3d8_push_check_declaration(uint32_t object);
++static void shadow_sync_push(void)
++{
++    hle_d3d8_push_sync();
++    hle_d3d8_push_check_declaration(hle_d3d8_shadow_program_object());
++}
 +
  /* From hle_d3d8_vertex.c: vertex `first` of stream `stream`, or NULL. */
  const void *hle_d3d8_stream_vertices(uint32_t stream, uint32_t first, uint32_t vertices,
                                       uint32_t *stride);
-@@ -839,6 +845,11 @@ static void note_draw_format(uint32_t xpt, uint32_t stride)
+@@ -839,6 +857,11 @@ static void note_draw_format(uint32_t xpt, uint32_t stride)
      }
  }
  
@@ -225,7 +376,7 @@ index c36f128..2b37547 100644
  /* Common checks for a draw under the current vertex shader. */
  static int shadow_can_draw(uint32_t xpt, uint32_t stride)
  {
-@@ -862,6 +873,27 @@ static int shadow_can_draw(uint32_t xpt, uint32_t stride)
+@@ -862,6 +885,27 @@ static int shadow_can_draw(uint32_t xpt, uint32_t stride)
              return 0;
          }
          if (stride < p->extent) {        /* the layout would read past a vertex */
@@ -253,7 +404,7 @@ index c36f128..2b37547 100644
              g_draws_stride++;
              return 0;
          }
-@@ -1988,6 +2020,16 @@ static void shadow_read_declaration(int slot, uint32_t handle)
+@@ -1988,6 +2032,16 @@ static void shadow_read_declaration(int slot, uint32_t handle)
          n++;
      }
  
@@ -270,12 +421,28 @@ index c36f128..2b37547 100644
      if (!refused && n > 0 && SUCCEEDED(host_vsh_set_declaration(p->host, in, n))) {
          p->has_declaration = 1;
          p->packed_count = packed;
+@@ -3375,6 +3429,7 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
+ 
+     if (!g_shadow || !verts || !stride || !count)
+         return;
++    shadow_sync_push();
+     if (!shadow_can_draw(xpt, stride))
+         return;
+     if (!xbox_primitive_to_host(xpt, count, &pt, &prims)) {
+@@ -3432,6 +3487,7 @@ void hle_d3d8_shadow_draw_indexed(uint32_t xpt, uint32_t count, const uint16_t *
+ 
+     if (!g_shadow || !idx || !verts || !stride || !count)
+         return;
++    shadow_sync_push();
+     if (!shadow_can_draw(xpt, stride))
+         return;
+     if (!xbox_primitive_to_host(xpt, count, &pt, &prims)) {
 diff --git a/src/hle/hle_d3d8_push.c b/src/hle/hle_d3d8_push.c
 new file mode 100644
-index 0000000..61e0bef
+index 0000000..a5a12f0
 --- /dev/null
 +++ b/src/hle/hle_d3d8_push.c
-@@ -0,0 +1,296 @@
+@@ -0,0 +1,570 @@
 +/*
 + * hle_d3d8_push.c -- the NV2A vertex arrays, read from the push buffer.
 + *
@@ -310,6 +477,11 @@ index 0000000..61e0bef
 +#include "hle.h"
 +
 +#ifdef _WIN32
++#include "d3d8_xbox.h"
++#include "d3d8_vsh.h"
++#include "hle_d3d8_record.h"
++
++IDirect3DDevice8 *hle_d3d8_shadow_device(void);
 +
 +HLE_ORIGINAL(D3DDevice_EndPush);
 +HLE_IMPORT_VAR(D3D_g_pDevice);
@@ -326,6 +498,11 @@ index 0000000..61e0bef
 +static struct { uint32_t method; unsigned long writes; uint32_t first; } g_seen[PUSH_MAX_METHODS];
 +static int g_seen_count;
 +static unsigned long g_syncs, g_words, g_lost, g_title_draws, g_title_missing;
++static unsigned long g_title_moved;
++static uint64_t g_trace_t0;   /* RECOMP_HLE_D3D8_ARRAY_TRACE arms 45 s after the first draw */  /* gathered although stream 0 looked wide enough */
++static unsigned long g_vdata_sets;   /* current values set from SET_VERTEX_DATA* */
++static unsigned long g_const_regs;   /* constant registers replayed from the walk */
++static unsigned long g_hw_begins;    /* SET_BEGIN_END(primitive): draws the hardware saw */
 +
 +/* Title RAM or the contiguous window: the only places a push buffer lives. A
 + * walk follows jumps and runs ahead of a pointer it does not trust, so every
@@ -376,19 +553,117 @@ index 0000000..61e0bef
 +        return;
 +    last = now;
 +    fprintf(stderr, "[HLE-D3D8] push buffer: %lu syncs, %lu dwords, %lu lost; "
-+                    "title-array draws %lu, out of range %lu; methods:\n",
-+            g_syncs, g_words, g_lost, g_title_draws, g_title_missing);
++                    "title-array draws %lu (%lu not where stream 0 said), out of range %lu; "
++                    "%lu constant registers, %lu current values; "
++                    "%lu hardware draws (BEGIN_END); methods:\n",
++            g_syncs, g_words, g_lost, g_title_draws, g_title_moved, g_title_missing, g_const_regs, g_vdata_sets,
++            g_hw_begins);
 +    for (i = 0; i < g_seen_count; i++)
 +        fprintf(stderr, "[HLE-D3D8]   0x%04X x%lu (first 0x%08X)\n",
 +                g_seen[i].method, g_seen[i].writes, g_seen[i].first);
 +}
 +
++/* Vertex program constants, as the hardware loads them: SET_TRANSFORM_
++ * CONSTANT_LOAD (0x1EA4) sets the register, then SET_TRANSFORM_CONSTANT
++ * (0x0B80..0x0BFC) streams float4s into it, the register advancing after
++ * every fourth word. The XDK's SetVertexShaderConstant* are replaced and
++ * forward their constants, but a title may write them itself:
++ * TimeSplitters: Future Perfect writes its characters' bone matrices this
++ * way, and with them stale on the host its arms and the character-select
++ * models were drawn from whatever matrices were left, or not at all. The
++ * walk replays them in push-buffer order, so a constant the XDK also
++ * forwarded only arrives twice with the same value. */
++static uint32_t g_const_load, g_const_words[4];
++
++/* An input register's current value: what a vertex program reads from a
++ * register no enabled array feeds. The hardware takes it from the
++ * SET_VERTEX_DATA* methods, and FP writes those itself -- the glow on its
++ * first-person weapon colours its vertices from v2 with no colour array, and
++ * with v2 left at the host's default it drew as a dark blob mid-screen.
++ * Packed forms as xemu decodes them; inside BEGIN_END a write to v0 emits a
++ * vertex rather than setting anything, so that one is left alone. */
++static uint32_t g_vdata_words[NV_ATTRS][4];
++static int g_in_begin;
++
++static void set_current(uint32_t reg, float x, float y, float z, float w)
++{
++    float f[4];
++
++    if (reg >= NV_ATTRS || (reg == 0u && g_in_begin) || !hle_d3d8_shadow_device())
++        return;
++    f[0] = x; f[1] = y; f[2] = z; f[3] = w;
++    host_vsh_set_vertex_data((int)reg, f);
++    g_vdata_sets++;
++}
++
++static float word_float(uint32_t w)
++{
++    float f;
++    memcpy(&f, &w, sizeof f);
++    return f;
++}
++
++static void track_vertex_data(uint32_t method, uint32_t value)
++{
++    if (method >= 0x1880u && method < 0x1900u) {          /* DATA2F_M */
++        uint32_t reg = (method - 0x1880u) / 8u, k = ((method - 0x1880u) / 4u) & 1u;
++        g_vdata_words[reg][k] = value;
++        if (k == 1u)
++            set_current(reg, word_float(g_vdata_words[reg][0]), word_float(value), 0.0f, 1.0f);
++    } else if (method >= 0x1900u && method < 0x1940u) {   /* DATA2S */
++        set_current((method - 0x1900u) / 4u, (float)(int16_t)(value & 0xFFFFu),
++                    (float)(int16_t)(value >> 16), 0.0f, 1.0f);
++    } else if (method >= 0x1940u && method < 0x1980u) {   /* DATA4UB */
++        set_current((method - 0x1940u) / 4u, (float)(value & 0xFFu) / 255.0f,
++                    (float)((value >> 8) & 0xFFu) / 255.0f,
++                    (float)((value >> 16) & 0xFFu) / 255.0f,
++                    (float)(value >> 24) / 255.0f);
++    } else if (method >= 0x1980u && method < 0x1A00u) {   /* DATA4S_M */
++        uint32_t reg = (method - 0x1980u) / 8u, k = ((method - 0x1980u) / 4u) & 1u;
++        g_vdata_words[reg][k] = value;
++        if (k == 1u)
++            set_current(reg, (float)(int16_t)(g_vdata_words[reg][0] & 0xFFFFu),
++                        (float)(int16_t)(g_vdata_words[reg][0] >> 16),
++                        (float)(int16_t)(value & 0xFFFFu), (float)(int16_t)(value >> 16));
++    } else if (method >= 0x1A00u && method < 0x1B00u) {   /* DATA4F_M */
++        uint32_t reg = (method - 0x1A00u) / 16u, k = ((method - 0x1A00u) / 4u) & 3u;
++        g_vdata_words[reg][k] = value;
++        if (k == 3u)
++            set_current(reg, word_float(g_vdata_words[reg][0]),
++                        word_float(g_vdata_words[reg][1]),
++                        word_float(g_vdata_words[reg][2]), word_float(value));
++    }
++}
++
 +static void track(uint32_t method, uint32_t value)
 +{
++    if (method >= 0x1880u && method < 0x1B00u) {
++        track_vertex_data(method, value);
++        return;
++    }
 +    if (method >= 0x1720u && method < 0x1720u + 4u * NV_ATTRS)
 +        g_arr_offset[(method - 0x1720u) / 4u] = value;
 +    else if (method >= 0x1760u && method < 0x1760u + 4u * NV_ATTRS)
 +        g_arr_format[(method - 0x1760u) / 4u] = value;
++    else if (method == 0x17FCu) {
++        g_in_begin = value != 0u;
++        if (value)
++            g_hw_begins++;
++    } else if (method == 0x1EA4u)
++        g_const_load = value;
++    else if (method >= 0x0B80u && method < 0x0C00u) {
++        uint32_t k = ((method - 0x0B80u) / 4u) & 3u;
++        g_const_words[k] = value;
++        if (k == 3u) {
++            if (g_const_load < NV2A_VS_MAX_CONSTANTS && hle_d3d8_shadow_device()) {
++                float f[4];
++                memcpy(f, g_const_words, sizeof f);
++                host_vsh_set_constant((int)g_const_load, f, 1);
++                g_const_regs++;
++            }
++            g_const_load++;
++        }
++    }
 +}
 +
 +/* Walk [p, end) as NV2A method packets, a header with the method in its low
@@ -493,6 +768,49 @@ index 0000000..61e0bef
 +    hle_d3d8_push_sync();
 +}
 +
++/* RECOMP_HLE_D3D8_ARRAY_CHECK=1: at each draw, compare the declaration the
++ * shadow renderer reads from the program object with the vertex arrays the
++ * push buffer actually enabled, and print each distinct disagreement once.
++ * An attribute the hardware fetches but the declaration lacks reaches the
++ * host program as a stale constant value. */
++void hle_d3d8_push_check_declaration(uint32_t object)
++{
++    static int on = -1, said;
++    static uint32_t seen[64][2];
++    char line[512];
++    uint32_t i, hw = 0, decl = 0;
++    int n, k;
++
++    if (on < 0)
++        on = getenv("RECOMP_HLE_D3D8_ARRAY_CHECK") != NULL;
++    if (!on || !object || said >= 64)
++        return;
++    for (i = 0; i < NV_ATTRS; i++) {
++        uint32_t dfmt = HLE_MEM32(object + 20u + i * 16u + 8u);
++        if ((g_arr_format[i] & 0xF0u) != 0u)
++            hw |= 1u << i;
++        if (dfmt > 2u)
++            decl |= 1u << i;
++    }
++    if (hw == decl)
++        return;
++    for (k = 0; k < said; k++)
++        if (seen[k][0] == hw && seen[k][1] == decl)
++            return;
++    seen[said][0] = hw;
++    seen[said][1] = decl;
++    said++;
++    n = snprintf(line, sizeof line, "[HLE-D3D8] arrays %04X vs declaration %04X:", hw, decl);
++    for (i = 0; i < NV_ATTRS && n < (int)sizeof line - 48; i++) {
++        uint32_t dfmt = HLE_MEM32(object + 20u + i * 16u + 8u);
++        if (((hw ^ decl) >> i) & 1u)
++            n += snprintf(line + n, sizeof line - (size_t)n, " v%u hw=%08X@%08X decl=%02X+%u",
++                          i, g_arr_format[i], g_arr_offset[i], dfmt,
++                          HLE_MEM32(object + 20u + i * 16u + 4u));
++    }
++    fprintf(stderr, "%s\n", line);
++}
++
 +/* Bytes an X_D3DVSDT / NV2A array format occupies per element. */
 +static uint32_t format_bytes(uint32_t fmt)
 +{
@@ -504,6 +822,76 @@ index 0000000..61e0bef
 +    return per[type & 7u] * count;
 +}
 +
++/* After an array draw the hardware leaves each enabled attribute's current
++ * value at the last vertex it fetched (xemu's pgraph models it the same way),
++ * so a later draw that leaves the register unfed reads that. FP colours its
++ * first-person weapon glow from v2 with no colour array: on the console it
++ * inherits the colour of the draw before; on the host it read (0, 0, 0, 1)
++ * and the glow was a black blob in the middle of the screen. `last` is the
++ * index of the last vertex, as the arrays count it. */
++void hle_d3d8_push_after_draw(uint32_t last)
++{
++    static float cur[NV_ATTRS][4];
++    uint32_t i;
++
++    if (!hle_d3d8_shadow_device())
++        return;
++    for (i = 0; i < NV_ATTRS; i++) {
++        uint32_t fmt = g_arr_format[i], type = fmt & 0xFu, count = (fmt >> 4) & 0xFu;
++        uint32_t stride = (fmt >> 8) & 0xFFu, c;
++        uint64_t at = (uint64_t)CONTIG_BASE + (g_arr_offset[i] & (CONTIG_SIZE - 1u)) +
++                      (uint64_t)last * stride;
++        const uint8_t *p;
++        float f[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
++
++        if (!count || count > 4u || at + 16u > (uint64_t)CONTIG_BASE + CONTIG_SIZE)
++            continue;
++        p = (const uint8_t *)HLE_PTR((uint32_t)at);
++        switch (type) {
++        case 0u:                            /* UB_D3D: B, G, R, A in memory */
++            f[0] = p[2] / 255.0f; f[1] = p[1] / 255.0f;
++            f[2] = p[0] / 255.0f; f[3] = p[3] / 255.0f;
++            break;
++        case 4u:                            /* UB_OGL */
++            for (c = 0; c < count; c++)
++                f[c] = p[c] / 255.0f;
++            break;
++        case 1u:                            /* S1: normalised shorts */
++        case 5u:                            /* S32K: shorts as they are */
++            for (c = 0; c < count; c++) {
++                int16_t v;
++                memcpy(&v, p + 2u * c, sizeof v);
++                f[c] = type == 1u ? v / 32767.0f : (float)v;
++            }
++            break;
++        case 2u:                            /* F */
++            memcpy(f, p, count * sizeof f[0]);
++            break;
++        case 6u: {                          /* CMP: 11:11:10 signed */
++            uint32_t bits;
++            memcpy(&bits, p, sizeof bits);
++            f[0] = (float)((int32_t)(bits << 21) >> 21) / 1023.0f;
++            f[1] = (float)((int32_t)(bits << 10) >> 21) / 1023.0f;
++            f[2] = (float)((int32_t)bits >> 22) / 511.0f;
++            break;
++        }
++        default:
++            continue;
++        }
++        if (memcmp(cur[i], f, sizeof f) == 0)
++            continue;
++        memcpy(cur[i], f, sizeof f);
++        host_vsh_set_vertex_data((int)i, f);
++    }
++}
++
++/* RECOMP_HLE_D3D8_ARRAY_TRACE_AFTER=<ms> moves the trace window (45 s). */
++static uint64_t trace_after_ms(void)
++{
++    const char *e = getenv("RECOMP_HLE_D3D8_ARRAY_TRACE_AFTER");
++    return e ? (uint64_t)strtoul(e, NULL, 10) : 45000u;
++}
++
 +/* From hle_d3d8.c: the guest vertex shader object of the program selected
 + * now, whose 16 attribute slots at +20 hold the declaration; 0 if none. */
 +uint32_t hle_d3d8_shadow_program_object(void);
@@ -512,13 +900,19 @@ index 0000000..61e0bef
 + * as the selected program's declaration says one interleaved vertex looks, so
 + * the shadow draw reads them like any stream 0 vertex.
 + *
-+ * Returns NULL, leaving the stream 0 path to it, unless the declared vertex
-+ * is larger than `stream_stride` -- the case that path skips. Also NULL when
-+ * there is no program, an array runs outside the contiguous window, or no
-+ * array stands behind a declared register. The buffer is the caller's until
-+ * the next call on this thread. */
++ * Returns NULL, leaving the stream 0 path to it, when every declared
++ * attribute's array is exactly where the stream 0 view says: offset
++ * stream_base + its declared offset, stride stream_stride. That used to be
++ * "unless the declared vertex is larger than stream_stride", which let a
++ * stale stream 0 with a wide enough stride stand in for arrays the title set
++ * itself: FP's blob shadows (stride 40 under a 28-byte declaration) took
++ * their positions from unit normals and floated in front of the camera.
++ * Also NULL when there is no program, an array runs outside the contiguous
++ * window, or no array stands behind a declared register. The buffer is the
++ * caller's until the next call on this thread. */
 +const void *hle_d3d8_title_vertices(uint32_t first, uint32_t vertices,
-+                                    uint32_t stream_stride, uint32_t *stride_out)
++                                    uint32_t stream_base, uint32_t stream_stride,
++                                    uint32_t *stride_out)
 +{
 +    static __declspec(thread) uint8_t *buf;
 +    static __declspec(thread) size_t cap;
@@ -526,6 +920,13 @@ index 0000000..61e0bef
 +    uint32_t doff[NV_ATTRS], dsize[NV_ATTRS];
 +    size_t need;
 +
++    if (!object && getenv("RECOMP_HLE_D3D8_ARRAY_TRACE") &&
++        (uint32_t)atoi(getenv("RECOMP_HLE_D3D8_ARRAY_TRACE")) == stream_stride) {
++        static int said;
++        if (said++ < 20)
++            fprintf(stderr, "[HLE-D3D8] array trace: %u vertices, stride %u, no program object\n",
++                    vertices, stream_stride);
++    }
 +    if (!object || !vertices)
 +        return NULL;
 +    for (i = 0; i < NV_ATTRS; i++) {
@@ -536,9 +937,49 @@ index 0000000..61e0bef
 +        if (dsize[i] && doff[i] + dsize[i] > extent)
 +            extent = doff[i] + dsize[i];
 +    }
-+    if (!extent || extent > 256u || extent <= stream_stride)
-+        return NULL;
 +    hle_d3d8_push_sync();
++    /* RECOMP_HLE_D3D8_ARRAY_TRACE=<stride>: for draws whose stream 0 stride
++     * or declared vertex size is that (1: every draw), from 45 s in, print the declaration beside the arrays the hardware has. */
++    {
++        static int trace = -1, said;
++        if (trace < 0) {
++            const char *e = getenv("RECOMP_HLE_D3D8_ARRAY_TRACE");
++            trace = e ? atoi(e) : 0;
++            g_trace_t0 = GetTickCount64();
++        }
++        if (trace && (trace == 1 || (uint32_t)trace == stream_stride ||
++                      (uint32_t)trace == ((extent + 3u) & ~3u)) &&
++            said < 400 && GetTickCount64() - g_trace_t0 > trace_after_ms()) {
++            said++;
++            fprintf(stderr, "[HLE-D3D8] array trace: %u vertices from %u, stream 0 at "
++                    "0x%07X stride %u, program 0x%08X\n", vertices, first, stream_base,
++                    stream_stride, object);
++            for (i = 0; i < NV_ATTRS; i++)
++                if (dsize[i] || (g_arr_format[i] & 0xFFu) > 2u)
++                    fprintf(stderr, "[HLE-D3D8]   v%-2u decl +%u fmt %02X | hw 0x%07X "
++                            "fmt %08X (stride %u)\n", i, doff[i],
++                            HLE_MEM32(object + 20u + i * 16u + 8u),
++                            g_arr_offset[i] & (CONTIG_SIZE - 1u), g_arr_format[i],
++                            (g_arr_format[i] >> 8) & 0xFFu);
++        }
++    }
++    if (!extent || extent > 256u)
++        return NULL;
++    if (extent <= stream_stride && stream_base != ~0u) {
++        int same = 1;
++        for (i = 0; i < NV_ATTRS && same; i++) {
++            uint32_t afmt = g_arr_format[i];
++            if (!dsize[i] || (afmt & 0xFFu) <= 2u)
++                continue;
++            if (((afmt >> 8) & 0xFFu) != stream_stride ||
++                (g_arr_offset[i] & (CONTIG_SIZE - 1u)) !=
++                    ((stream_base + doff[i]) & (CONTIG_SIZE - 1u)))
++                same = 0;
++        }
++        if (same)
++            return NULL;
++        g_title_moved++;
++    }
 +    stride = (extent + 3u) & ~3u;
 +    need = (size_t)stride * vertices;
 +    if (need > cap) {
@@ -573,28 +1014,56 @@ index 0000000..61e0bef
 +
 +#endif /* _WIN32 */
 diff --git a/src/hle/hle_d3d8_vertex.c b/src/hle/hle_d3d8_vertex.c
-index c4d8f9c..e5e6ef0 100644
+index c4d8f9c..f4711f8 100644
 --- a/src/hle/hle_d3d8_vertex.c
 +++ b/src/hle/hle_d3d8_vertex.c
-@@ -55,6 +55,11 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
+@@ -55,6 +55,16 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
  void hle_d3d8_shadow_draw_indexed(uint32_t xpt, uint32_t count, const uint16_t *idx,
                                    const void *verts, uint32_t stride, int from_buffer);
  void hle_d3d8_shadow_set_first_vertex(uint32_t first);
 +/* From hle_d3d8_push.c: the vertex arrays the title (or the XDK) wrote to the
 + * push buffer, gathered into the declaration's layout when the stream 0 view
-+ * cannot hold the declared vertex. */
++ * does not describe them. stream_base is the contiguous-memory offset the
++ * stream 0 view puts vertex 0 at, ~0u if there is none. */
 +const void *hle_d3d8_title_vertices(uint32_t first, uint32_t vertices,
-+                                    uint32_t stream_stride, uint32_t *stride);
++                                    uint32_t stream_base, uint32_t stream_stride,
++                                    uint32_t *stride);
++/* From hle_d3d8_push.c: leave the enabled attributes' current values at the
++ * draw's last vertex, as the hardware does. */
++void hle_d3d8_push_after_draw(uint32_t last);
  
  #define CONTIG_BASE 0x80000000u
  #define CONTIG_SIZE (64u * 1024u * 1024u)    /* kernel.h XBOX_CONTIG_SIZE */
-@@ -226,8 +231,12 @@ HLE_EXPORT(D3DDevice_DrawVertices)
+@@ -79,6 +89,21 @@ static int guest_readable(uint32_t va, uint64_t bytes)
+ /* Host pointer to vertex `first` of the stream 0 buffer, for `vertices`
+  * vertices, or NULL (counted) if there is no buffer or it would read outside
+  * the contiguous window. */
++/* Where the stream 0 view puts vertex `first`, as an offset into contiguous
++ * memory -- what the XDK writes to the NV2A array offsets -- or ~0u. */
++static uint32_t stream0_base(uint32_t first)
++{
++    uint32_t data;
++
++    if (!g_stream0_vb || !g_stream0_stride || !guest_readable(g_stream0_vb, 12u))
++        return ~0u;
++    data = HLE_MEM32(g_stream0_vb + 4u);
++    if (!data)
++        return ~0u;
++    return (uint32_t)(((uint64_t)(data & (CONTIG_SIZE - 1u)) +
++                       (uint64_t)first * g_stream0_stride) & (CONTIG_SIZE - 1u));
++}
++
+ static const void *stream0_vertices(uint32_t first, uint32_t vertices)
+ {
+     uint32_t data, va;
+@@ -226,11 +251,17 @@ HLE_EXPORT(D3DDevice_DrawVertices)
      HLE_CALL_ORIGINAL(D3DDevice_DrawVertices);
  #ifdef _WIN32
      if (hle_d3d8_shadow_device() && count) {
 -        const void *verts = stream0_vertices(start, count);
 +        uint32_t tstride = 0;
-+        const void *verts = hle_d3d8_title_vertices(start, count, g_stream0_stride, &tstride);
++        const void *verts = hle_d3d8_title_vertices(start, count, stream0_base(0u),
++                                                    g_stream0_stride, &tstride);
          if (verts) {
 +            /* The arrays the title set itself, in the declaration's layout. */
 +            hle_d3d8_shadow_draw(xpt, count, verts, tstride, 1);
@@ -602,24 +1071,107 @@ index c4d8f9c..e5e6ef0 100644
              hle_d3d8_shadow_set_first_vertex(start);
              hle_d3d8_shadow_draw(xpt, count, verts, g_stream0_stride, 1);
          }
-@@ -267,8 +276,11 @@ HLE_EXPORT(D3DDevice_DrawIndexedVertices)
++        hle_d3d8_push_after_draw(start + count - 1u);
+         report();
+     }
+ #endif
+@@ -267,11 +298,16 @@ HLE_EXPORT(D3DDevice_DrawIndexedVertices)
                  fprintf(stderr, "[HLE-D3D8] shadow buffers: CDevice_SetStateVB never "
                          "ran; indexed buffer draws use base vertex 0\n");
          }
 -        verts = stream0_vertices(g_base_vertex, vertices);
 +        uint32_t tstride = 0;
-+        verts = hle_d3d8_title_vertices(0, vertices, g_stream0_stride, &tstride);
++        verts = hle_d3d8_title_vertices(0, vertices, stream0_base(g_base_vertex),
++                                        g_stream0_stride, &tstride);
          if (verts) {
 +            hle_d3d8_shadow_draw_indexed(xpt, count, idx, verts, tstride, 1);
 +        } else if ((verts = stream0_vertices(g_base_vertex, vertices)) != NULL) {
              hle_d3d8_shadow_set_first_vertex(g_base_vertex);
              hle_d3d8_shadow_draw_indexed(xpt, count, idx, verts, g_stream0_stride, 1);
          }
++        hle_d3d8_push_after_draw(idx[count - 1u]);
+         report();
+     }
+ #endif
+diff --git a/src/hle/hle_dsound.c b/src/hle/hle_dsound.c
+index 6a91ea4..d481bde 100644
+--- a/src/hle/hle_dsound.c
++++ b/src/hle/hle_dsound.c
+@@ -125,11 +125,61 @@ static int guest_readable(uint32_t va, uint32_t bytes)
+  * Burnout 2 crashed reading one (guest 0xFFFFD9AC) from StopEx while loading a
+  * race. A 0 reads as "the buffer changed", and pump() and model_for() retire
+  * the slot. */
++/* The DSOUND library build, from the XBE header's library version table
++ * (mapped at 0x10000: count at +0x160, table address at +0x164, 16-byte
++ * entries of name[8], major, minor, build, flags). 0 if it cannot be read. */
++static uint32_t dsound_build(void)
++{
++    static int done;
++    static uint32_t build;
++    uint32_t n, table, i;
++
++    if (done)
++        return build;
++    done = 1;
++    n = HLE_MEM32(0x10160u);
++    table = HLE_MEM32(0x10164u);
++    if (n > 64u || !guest_readable(table, n * 16u))
++        return 0u;
++    for (i = 0; i < n; i++) {
++        const char *name = (const char *)HLE_PTR(table + i * 16u);
++        if (memcmp(name, "DSOUND\0", 7) == 0) {
++            build = HLE_MEM32(table + i * 16u + 12u) & 0xFFFFu;
++            break;
++        }
++    }
++    return build;
++}
++
++/* The buffer half of the settings moved 4 bytes later by XDK 5849
++ * (TimeSplitters: Future Perfect): CDirectSoundBufferSettings_SetBufferData
++ * writes the data pointer to +0xBC and the size to +0xC0, and
++ * CDirectSoundBuffer_SetLoopRegion writes +0xCC/+0xD0 after checking against
++ * the play length at +0xC8. Read with the 5344 offsets, the "size" was the
++ * data pointer (0x8088C080...), so no ADPCM buffer got a model and every
++ * sound effect was silent. The voice half (format, rate, volume) is
++ * unchanged. Which build between 5344 and 5849 moved it is not known; the
++ * ones in between keep the old layout until a title says otherwise. */
++static uint32_t buffer_field_shift(void)
++{
++    static int said;
++    uint32_t build = dsound_build();
++    uint32_t shift = build >= 5849u ? 4u : 0u;
++    if (!said++) {
++        fprintf(stderr, "[DSOUND] library build %u: buffer settings at +0x%02X\n",
++                build, SET_DATA + shift);
++        fflush(stderr);
++    }
++    return shift;
++}
++
+ static uint32_t setting(uint32_t iface, uint32_t offset)
+ {
+     uint32_t holder = voice_field(offset) ? iface - 0x0Cu : iface;
+     uint32_t object;
+ 
++    if (!voice_field(offset))
++        offset += buffer_field_shift();
+     if (!guest_readable(holder, 4u))
+         return 0u;
+     object = HLE_MEM32(holder);
 diff --git a/src/hle/hle_dsound_stream.c b/src/hle/hle_dsound_stream.c
-index ee775d2..554e02e 100644
+index ee775d2..05316d8 100644
 --- a/src/hle/hle_dsound_stream.c
 +++ b/src/hle/hle_dsound_stream.c
-@@ -99,6 +99,7 @@ typedef struct Stream {
+@@ -48,6 +48,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <stdarg.h>
+ 
+ #include "hle.h"
+ #include "xbox_adpcm.h"
+@@ -99,6 +100,7 @@ typedef struct Stream {
      uint32_t iface;                  /* IDirectSoundStream the title holds */
      uint32_t object;                 /* CDirectSoundStream, bound at first use */
      uint32_t tag, channels, rate, bits, align;
@@ -627,31 +1179,199 @@ index ee775d2..554e02e 100644
      uint32_t max_packets;
      uint32_t callback, context;      /* LPFNXMEDIAOBJECTCALLBACK, its context */
      int      output;                 /* the host can play this format */
-@@ -521,6 +522,15 @@ static void record_stream(uint32_t iface, uint32_t desc)
-     s->tag         = HLE_MEM32(wfx) & 0xFFFFu;
-     s->channels    = HLE_MEM32(wfx) >> 16;
-     s->rate        = HLE_MEM32(wfx + 4u);
+@@ -154,6 +156,27 @@ static uint64_t now_ms(void) { return GetTickCount64(); }
+ /* Name the first few call sites of a replaced stream method, once each: a
+  * title that waits on a status this file reports differently from the console
+  * is found by reading the caller. */
++/* RECOMP_DSOUND_TRACE=1: every stream call and packet completion, with the
++ * host time, for lining the sound up against the picture. */
++static void trace(const char *fmt, ...)
++{
++    static int on = -1;
++    static uint64_t t0;
++    va_list ap;
++
++    if (on < 0) {
++        on = xbox_EnvSwitch("RECOMP_DSOUND_TRACE", 0);
++        t0 = GetTickCount64();
++    }
++    if (!on)
++        return;
++    fprintf(stderr, "[DSTRACE] %8llu ms ", (unsigned long long)(GetTickCount64() - t0));
++    va_start(ap, fmt);
++    vfprintf(stderr, fmt, ap);
++    va_end(ap);
++    fputc('\n', stderr);
++}
++
+ static void note_caller(const char *what)
+ {
+     static uint32_t seen[12];
+@@ -313,6 +336,7 @@ static Stream *find_by_object(uint32_t object)
+ static void complete(Stream *s, const Packet *p, uint32_t status, uint32_t size)
+ {
+     g_packets_done++;
++    trace("%08X complete %08X status %08X size %u", s->iface, p->data, status, size);
+     if (p->status_va && guest_readable(p->status_va, 4u))
+         HLE_MEM32(p->status_va) = status;
+     if (p->completed_va && guest_readable(p->completed_va, 4u))
+@@ -484,6 +508,29 @@ void hle_dsound_stream_tick(uint64_t now)
+     unlock();
+ }
+ 
++/* Take the stream's format from a guest WAVEFORMATEX (the caller has checked
++ * 16 bytes are readable). */
++static void set_format(Stream *s, uint32_t wfx)
++{
++    s->tag         = HLE_MEM32(wfx) & 0xFFFFu;
++    s->channels    = HLE_MEM32(wfx) >> 16;
++    s->rate        = HLE_MEM32(wfx + 4u);
 +    s->created_rate = s->rate;
 +    /* RECOMP_DSOUND_STREAM_RATE=<Hz> plays every stream at that rate instead:
-+     * a listening test for "the music is too fast or too slow", since the
-+     * rate the title declares is the only one this file can see. */
++     * a listening test for "the music is too fast or too slow". */
 +    {
 +        const char *forced = getenv("RECOMP_DSOUND_STREAM_RATE");
 +        if (forced && atoi(forced) >= 1000 && atoi(forced) <= 200000)
 +            s->rate = (uint32_t)atoi(forced);
 +    }
-     s->align       = HLE_MEM32(wfx + 12u) & 0xFFFFu;
-     s->bits        = HLE_MEM32(wfx + 12u) >> 16;
++    s->align       = HLE_MEM32(wfx + 12u) & 0xFFFFu;
++    s->bits        = HLE_MEM32(wfx + 12u) >> 16;
++    s->output = s->channels >= 1u && s->channels <= 2u &&
++                s->rate >= 1000u && s->rate <= 200000u &&
++                ((s->tag == TAG_PCM && (s->bits == 8u || s->bits == 16u)) ||
++                 (s->tag == TAG_ADPCM && s->bits == 4u));
++}
++
+ /* Record a stream the title just created, from its DSSTREAMDESC:
+  *   +0 dwFlags  +4 dwMaxAttachedPackets  +8 lpwfxFormat  +C lpMixBins
+  *   +10 lpfnCallback  +14 lpvContext
+@@ -518,18 +565,10 @@ static void record_stream(uint32_t iface, uint32_t desc)
+     }
+     memset(s, 0, sizeof *s);
+     s->iface       = iface;
+-    s->tag         = HLE_MEM32(wfx) & 0xFFFFu;
+-    s->channels    = HLE_MEM32(wfx) >> 16;
+-    s->rate        = HLE_MEM32(wfx + 4u);
+-    s->align       = HLE_MEM32(wfx + 12u) & 0xFFFFu;
+-    s->bits        = HLE_MEM32(wfx + 12u) >> 16;
++    set_format(s, wfx);
      s->max_packets = max_packets && max_packets < MAX_PACKETS ? max_packets : MAX_PACKETS;
-@@ -543,6 +553,7 @@ static void record_stream(uint32_t iface, uint32_t desc)
+     s->callback    = callback;
+     s->context     = context;
+-    s->output = s->channels >= 1u && s->channels <= 2u &&
+-                s->rate >= 1000u && s->rate <= 200000u &&
+-                ((s->tag == TAG_PCM && (s->bits == 8u || s->bits == 16u)) ||
+-                 (s->tag == TAG_ADPCM && s->bits == 4u));
+     if (said < 8) {
+         said++;
+         fprintf(stderr, "[DSOUND] stream %08X: tag %04X %u ch %u Hz %u bit align %u, "
+@@ -543,6 +582,8 @@ static void record_stream(uint32_t iface, uint32_t desc)
  HLE_ORIGINAL(DirectSoundCreateStream);
  HLE_ORIGINAL(CDirectSound_CreateSoundStream);
  HLE_ORIGINAL(CDirectSoundStream_SetVolume);
 +HLE_ORIGINAL(CDirectSoundStream_SetFrequency);
++HLE_ORIGINAL(CDirectSoundStream_SetFormat);
  
  /* HRESULT DirectSoundCreateStream(LPCDSSTREAMDESC pdssd,
   *     LPDIRECTSOUNDSTREAM *ppStream) */
-@@ -772,3 +783,42 @@ HLE_EXPORT(CDirectSoundStream_SetVolume)
+@@ -619,6 +660,10 @@ HLE_EXPORT(CDirectSoundStream_Process)
+     s->count++;
+     if (p->status_va && guest_readable(p->status_va, 4u))
+         HLE_MEM32(p->status_va) = XMP_STATUS_PENDING;
++    trace("%08X process %08X %u bytes (%llu ms of sound), %d queued, %s, from 0x%08X",
++          s->iface, p->data, p->size,
++          (unsigned long long)((p->end - p->start) * 1000u / (bytes_per_ms_x1000(s) ? bytes_per_ms_x1000(s) : 1u)),
++          s->count, s->paused ? "paused" : "running", HLE_MEM32(g_esp));
+     if (said < 4) {
+         said++;
+         fprintf(stderr, "[DSOUND] stream %08X: packet %u bytes at %08X (%d queued)\n",
+@@ -631,30 +676,60 @@ HLE_EXPORT(CDirectSoundStream_Process)
+ 
+ /* HRESULT CDirectSoundStream::Flush(this). Every pending packet comes back
+  * flushed, and the clock moves to the end of the data. */
++static void flush_stream(Stream *s)
++{
++    Packet flushed[MAX_PACKETS];
++    int n = 0, i;
++
++    trace("%08X flush, %d queued", s->iface, s->count);
++    while (s->count > 0) {
++        flushed[n++] = s->packets[s->head];
++        s->head = (s->head + 1) % MAX_PACKETS;
++        s->count--;
++    }
++    s->consumed_base = s->queued;
++    s->resumed_ms = 0u;
++    s->sent = s->queued;
++    recomp_audio_output_reset_voice(slot_of(s));
++    for (i = 0; i < n; i++)
++        complete(s, &flushed[i], XMP_STATUS_FLUSHED, 0u);
++}
++
+ HLE_EXPORT(CDirectSoundStream_Flush)
+ {
+     g_calls_flush++;
+     note_caller("Flush");
+-    uint64_t now = now_ms();
++    Stream *s;
++
++    lock();
++    s = find_by_object(HLE_ARG(0));
++    if (s)
++        flush_stream(s);
++    unlock();
++    HLE_RETURN(DS_OK);
++}
++
++/* HRESULT CDirectSoundStream::FlushEx(this, REFERENCE_TIME rtTimeStamp,
++ *     DWORD dwFlags)
++ *
++ * TimeSplitters: Future Perfect stops its music with Pause then FlushEx, and
++ * flushes its speech streams this way too. Unreplaced, the packets stayed
++ * queued here: after the next resume the old sound played out first, so a
++ * new piece of music started late by up to three packets (six seconds) and
++ * a line of dialogue could be heard again. A timestamp asks for the flush to
++ * happen later; it is done now, which only cuts the tail early. */
++HLE_EXPORT(CDirectSoundStream_FlushEx)
++{
++    g_calls_flush++;
++    note_caller("FlushEx");
+     Stream *s;
+ 
+     lock();
+     s = find_by_object(HLE_ARG(0));
+     if (s) {
+-        Packet flushed[MAX_PACKETS];
+-        int n = 0, i;
+-        while (s->count > 0) {
+-            flushed[n++] = s->packets[s->head];
+-            s->head = (s->head + 1) % MAX_PACKETS;
+-            s->count--;
+-        }
+-        s->consumed_base = s->queued;
+-        s->resumed_ms = 0u;
+-        s->sent = s->queued;
+-        recomp_audio_output_reset_voice(slot_of(s));
+-        for (i = 0; i < n; i++)
+-            complete(s, &flushed[i], XMP_STATUS_FLUSHED, 0u);
+-        (void)now;
++        trace("%08X flushex time %08X%08X flags %u", s->iface, HLE_ARG(2), HLE_ARG(1),
++              HLE_ARG(3));
++        flush_stream(s);
+     }
+     unlock();
+     HLE_RETURN(DS_OK);
+@@ -695,6 +770,9 @@ HLE_EXPORT(CDirectSoundStream_Pause)
+ 
+     lock();
+     s = find_by_object(HLE_ARG(0));
++    if (s)
++        trace("%08X pause(%u) was %s, %d queued, from 0x%08X", s->iface, mode,
++              s->paused ? "paused" : "running", s->count, HLE_MEM32(g_esp));
+     if (s) {
+         if (mode == DSSTREAMPAUSE_RESUME) {
+             if (s->paused) {
+@@ -772,3 +850,110 @@ HLE_EXPORT(CDirectSoundStream_SetVolume)
      }
      HLE_RETURN(DS_OK);
  }
@@ -694,11 +1414,105 @@ index ee775d2..554e02e 100644
 +    }
 +    HLE_RETURN(DS_OK);
 +}
++
++/* HRESULT CDirectSoundStream::SetFormat(this, LPCWAVEFORMATEX pwfx)
++ *
++ * The format in the DSSTREAMDESC is only the first one. TimeSplitters: Future
++ * Perfect creates one stream at 44.1 kHz and, before each file it plays, reads
++ * that file's WAVEFORMATEX and hands it here: 32 kHz and 22 kHz, mono and
++ * stereo. Ignoring it played every file at 44.1 kHz -- too fast and too high,
++ * and completing packets early, so dialogue ran ahead of its cutscene and was
++ * cut off or repeated when the title fed the next line. */
++HLE_EXPORT(CDirectSoundStream_SetFormat)
++{
++    uint32_t object = HLE_ARG(0), wfx = HLE_ARG(1);
++    static int said;
++    Stream *s;
++
++    lock();
++    s = find_by_object(object);
++    if (s && wfx && guest_readable(wfx, 16u))
++        trace("%08X setformat %08X %u Hz, was %s, %d queued", s->iface, HLE_MEM32(wfx),
++              HLE_MEM32(wfx + 4u), s->paused ? "paused" : "running", s->count);
++    /* The title sets the same format again with packets queued; resetting
++     * the voice for that would cut the sound. */
++    if (s && wfx && guest_readable(wfx, 16u) &&
++        !(HLE_MEM32(wfx) == (s->tag | s->channels << 16) &&
++          HLE_MEM32(wfx + 4u) == s->created_rate &&
++          (HLE_MEM32(wfx + 12u) >> 16) == s->bits)) {
++        uint64_t now = now_ms();
++        uint32_t old_frame = frame_bytes(s), old_tag = s->tag;
++        uint64_t c;
++        int i;
++
++        pump(s, now);
++        c = consumed(s, now);
++        set_format(s, wfx);
++        /* Normally the stream is idle here. If packets are still queued their
++         * positions are in the old format's bytes: lay them out again from
++         * the clock, so the timeline stays in one unit. */
++        if (s->count > 0 && (frame_bytes(s) != old_frame || s->tag != old_tag)) {
++            uint64_t at = c;
++            for (i = 0; i < s->count; i++) {
++                Packet *q = &s->packets[(s->head + i) % MAX_PACKETS];
++                q->start = at;
++                q->end = at + decoded_size(s, q->size);
++                at = q->end;
++            }
++            s->queued = at;
++        } else if (s->count == 0) {
++            s->queued = c;
++        }
++        s->consumed_base = c;
++        if (s->resumed_ms)
++            s->resumed_ms = now;
++        refeed(s, now);
++        if (said < 16) {
++            said++;
++            fprintf(stderr, "[DSOUND] stream %08X SetFormat: tag %04X %u ch %u Hz %u bit, "
++                    "%d packets queued, %s\n", s->iface, s->tag, s->channels, s->rate,
++                    s->bits, s->count, s->output ? "output" : "clock only");
++            fflush(stderr);
++        }
++    }
++    unlock();
++    if (hle_original_CDirectSoundStream_SetFormat) {
++        HLE_CALL_ORIGINAL(CDirectSoundStream_SetFormat);
++        return;
++    }
++    HLE_RETURN(DS_OK);
++}
 diff --git a/src/input/input_bindings.c b/src/input/input_bindings.c
-index ef22573..7e9a523 100644
+index ef22573..2cab81f 100644
 --- a/src/input/input_bindings.c
 +++ b/src/input/input_bindings.c
-@@ -685,6 +685,37 @@ const char *recomp_bindings_device_name(unsigned port)
+@@ -600,7 +600,24 @@ static int find_config(char *out, size_t n)
+             return 1;
+     }
+     snprintf(out, n, "input_bindings.json");
+-    return readable(out);
++    if (readable(out))
++        return 1;
++#if defined(_WIN32)
++    /* Beside the executable itself, whatever the working directory: a
++     * shortcut or a launcher may start it from somewhere else. */
++    {
++        char exe[MAX_PATH];
++        DWORD len = GetModuleFileNameA(NULL, exe, sizeof exe);
++        char *slash = len && len < sizeof exe ? strrchr(exe, '\\') : NULL;
++        if (slash) {
++            *slash = '\0';
++            snprintf(out, n, "%s\\input_bindings.json", exe);
++            if (readable(out))
++                return 1;
++        }
++    }
++#endif
++    return 0;
+ }
+ 
+ static char *read_file(const char *path)
+@@ -685,6 +702,37 @@ const char *recomp_bindings_device_name(unsigned port)
  
  #if defined(_WIN32)
  
@@ -736,7 +1550,7 @@ index ef22573..7e9a523 100644
  /* XInputGetState on an empty slot costs about a millisecond, and a title
   * polls its pads several times a frame: an unplugged port would cost more
   * than the game. An empty slot is re-checked once a second, a full one every
-@@ -696,7 +727,7 @@ static int pad_state(int index, XINPUT_STATE *out)
+@@ -696,7 +744,7 @@ static int pad_state(int index, XINPUT_STATE *out)
      static ULONGLONG retry_at[PORTS];
      ULONGLONG now = GetTickCount64();
  
@@ -745,7 +1559,7 @@ index ef22573..7e9a523 100644
          return 0;
      if (!connected[index] && now < retry_at[index])
          return 0;
-@@ -747,7 +778,7 @@ static DWORD g_key_state_at;
+@@ -747,7 +795,7 @@ static DWORD g_key_state_at;
  static int key_down(KeyCache *kc, int vk)
  {
      (void)kc;
@@ -754,3 +1568,219 @@ index ef22573..7e9a523 100644
          return 0;
      if (!g_key_state[vk])
          g_key_state[vk] = (GetAsyncKeyState(vk) & 0x8000) ? 2 : 1;
+diff --git a/src/kernel/nv2a_vsh.c b/src/kernel/nv2a_vsh.c
+index 1f1812f..e42cbff 100644
+--- a/src/kernel/nv2a_vsh.c
++++ b/src/kernel/nv2a_vsh.c
+@@ -601,12 +601,29 @@ static int vsh_do_ilu(NV2AVshIluOp op, const float c[4], float r[4])
+         vsh_splat(r, m == 0.0f ? FLT_MAX : 1.0f / sqrtf(m));
+         break;
+     }
+-    case NV2A_VSH_ILU_EXP:
+-        vsh_splat(r, powf(2.0f, x));
++    case NV2A_VSH_ILU_EXP: {
++        /* expp: (2^floor(s), s - floor(s), 2^s, 1), as d3d8_vsh.c emits. */
++        float f = floorf(x);
++        r[0] = powf(2.0f, f);
++        r[1] = x - f;
++        r[2] = powf(2.0f, x);
++        r[3] = 1.0f;
+         break;
++    }
+     case NV2A_VSH_ILU_LOG: {
++        /* logp: (floor(log2|s|), |s| / 2^that, log2|s|, 1). */
+         float m = x < 0.0f ? -x : x;
+-        vsh_splat(r, m == 0.0f ? -FLT_MAX : log2f(m));
++        if (m == 0.0f) {
++            r[0] = -FLT_MAX;
++            r[1] = 1.0f;
++            r[2] = -FLT_MAX;
++        } else {
++            float e = floorf(log2f(m));
++            r[0] = e;
++            r[1] = m / powf(2.0f, e);
++            r[2] = log2f(m);
++        }
++        r[3] = 1.0f;
+         break;
+     }
+     case NV2A_VSH_ILU_LIT: {
+diff --git a/src/replay/d3d8_replay.c b/src/replay/d3d8_replay.c
+index 8b1b559..4ee8df1 100644
+--- a/src/replay/d3d8_replay.c
++++ b/src/replay/d3d8_replay.c
+@@ -25,7 +25,7 @@
+  *                    capture's combiner token says.
+  *   --draws <n>      execute only the first n draws (state still applied;
+  *                    clears after the nth draw are skipped too).
+- *   --skip-draw <n>  leave out draw n (0-based).
++ *   --skip-draw <n>[-<m>]  leave out draw n, or draws n..m (0-based).
+  *   --list-draws     print every draw with the state it runs under.
+  *
+  * A player, not an emulator. A capture holds the calls shadow mode
+@@ -71,11 +71,11 @@ static int g_quiet;
+  * same moment. */
+ static int g_no_combiners;
+ /* Draw-level bisection: --draws N executes only the first N draws, --skip-draw
+- * N leaves out draw N (0-based), --list-draws prints each draw with the state
++ * N (or N-M) leaves out draw N (0-based) or that range, --list-draws prints each draw with the state
+  * it runs under. State chunks always run, so a draw left out changes nothing
+  * but its own pixels. */
+ static long g_max_draws = -1;
+-static long g_skip_draw = -1;
++static long g_skip_draw = -1, g_skip_last = -1;
+ static int  g_list_draws;
+ static long g_draw_index;           /* draws seen in this loop */
+ static DWORD g_cur_vs, g_cur_token;
+@@ -95,9 +95,17 @@ static void tex_desc(char *buf, size_t n, uint32_t id)
+ }
+ 
+ /* 1 if this draw should run, after listing it if asked. */
++/* REPLAY_NO_CULL=1 / REPLAY_NO_Z=1: draw every triangle whatever its winding,
++ * or whatever is in front of it, to tell missing geometry from hidden geometry. */
++static IDirect3DDevice8 *g_dev;
++
+ static int draw_gate(const char *kind, uint32_t prim, uint32_t count, uint32_t stride)
+ {
+     long n = g_draw_index++;
++    if (g_dev && getenv("REPLAY_NO_CULL"))
++        g_dev->lpVtbl->SetRenderState(g_dev, D3DRS_CULLMODE, D3DCULL_NONE);
++    if (g_dev && getenv("REPLAY_NO_Z"))
++        g_dev->lpVtbl->SetRenderState(g_dev, D3DRS_ZFUNC, D3DCMP_ALWAYS);
+ 
+     if (g_list_draws) {
+         const DWORD *rs = d3d8_GetRenderStates();
+@@ -107,26 +115,46 @@ static int draw_gate(const char *kind, uint32_t prim, uint32_t count, uint32_t s
+         tex_desc(t1, sizeof t1, g_stage_tex[1]);
+         fprintf(stderr, "[draw %4ld] tex %s %s\n", n, t0, t1);
+         fprintf(stderr, "[draw %4ld] %-8s prim %u x%-5u stride %2u  vs 0x%05lX  ps %lu  "
+-                "blend %lu %lu>%lu  atest %lu ref %lu  z %lu/%lu  fog %lu  cull %lu%s%s\n",
++                "blend %lu %lu>%lu  atest %lu ref %lu  z %lu/%lu  fog %lu  cull %lu  prog %08X%s%s\n",
+                 n, kind, prim, count, stride, (unsigned long)g_cur_vs,
+                 (unsigned long)(g_no_combiners ? 0 : g_cur_token),
+                 (unsigned long)rs[D3DRS_ALPHABLENDENABLE], (unsigned long)rs[D3DRS_SRCBLEND],
+                 (unsigned long)rs[D3DRS_DESTBLEND], (unsigned long)rs[D3DRS_ALPHATESTENABLE],
+                 (unsigned long)rs[D3DRS_ALPHAREF], (unsigned long)rs[D3DRS_ZENABLE],
+                 (unsigned long)rs[D3DRS_ZWRITEENABLE], (unsigned long)rs[D3DRS_FOGENABLE],
+-                (unsigned long)rs[D3DRS_CULLMODE],
++                (unsigned long)rs[D3DRS_CULLMODE], d3d8_vsh_slot_hash(g_cur_vs),
+                 (g_max_draws >= 0 && n >= g_max_draws) ? "  (not drawn: --draws)" : "",
+-                n == g_skip_draw ? "  (not drawn: --skip-draw)" : "");
++                (n >= g_skip_draw && n <= g_skip_last) ? "  (not drawn: --skip-draw)" : "");
++        /* REPLAY_SHOW_CONSTANTS=<first>[,<count>]: those registers as this
++         * draw sees them (default four: one matrix). */
++        if (getenv("REPLAY_SHOW_CONSTANTS")) {
++            const float *c = d3d8_vsh_constants();
++            unsigned first = 0, cnt = 4, r;
++            sscanf(getenv("REPLAY_SHOW_CONSTANTS"), "%u,%u", &first, &cnt);
++            for (r = first; r < first + cnt && r < 192u; r++)
++                fprintf(stderr, "[draw %4ld] c%u = %g %g %g %g\n", n, r,
++                        c[r * 4], c[r * 4 + 1], c[r * 4 + 2], c[r * 4 + 3]);
++        }
+         /* The states that discard fragments without leaving a mark. */
+         fprintf(stderr, "[draw %4ld] zfunc %lu afunc %lu colorwrite 0x%lX stencil %lu "
+                 "fill %lu shade %lu\n", n,
+                 (unsigned long)rs[D3DRS_ZFUNC], (unsigned long)rs[D3DRS_ALPHAFUNC],
+                 (unsigned long)rs[D3DRS_COLORWRITEENABLE], (unsigned long)rs[D3DRS_STENCILENABLE],
+                 (unsigned long)rs[D3DRS_FILLMODE], (unsigned long)rs[D3DRS_SHADEMODE]);
++        if (rs[D3DRS_FOGENABLE]) {
++            float fs, fe, fd;
++            memcpy(&fs, &rs[D3DRS_FOGSTART], 4);
++            memcpy(&fe, &rs[D3DRS_FOGEND], 4);
++            memcpy(&fd, &rs[D3DRS_FOGDENSITY], 4);
++            fprintf(stderr, "[draw %4ld] fog table %lu vertex %lu range %lu start %g end %g "
++                    "density %g color %08lX\n", n, (unsigned long)rs[D3DRS_FOGTABLEMODE],
++                    (unsigned long)rs[D3DRS_FOGVERTEXMODE], (unsigned long)rs[D3DRS_RANGEFOGENABLE],
++                    fs, fe, fd, (unsigned long)rs[D3DRS_FOGCOLOR]);
++        }
+     }
+     if (g_max_draws >= 0 && n >= g_max_draws)
+         return 0;
+-    return n != g_skip_draw;
++    return !(n >= g_skip_draw && n <= g_skip_last);
+ }
+ 
+ static void note(const char *fmt, ...)
+@@ -369,6 +397,24 @@ static void do_texture(Replay *r, const D3D8CapChunk *c)
+                 t->id, t->width, t->height, t->format, bytes[0], bytes[1], bytes[2], bytes[3]);
+     }
+ 
++    /* REPLAY_TEX_DUMP=<id>: write that texture's level 0, as recorded, to
++     * tex_<id>.bin, for looking at a texture that samples wrong. */
++    {
++        const char *want = getenv("REPLAY_TEX_DUMP");
++        if (want && (uint32_t)atoi(want) == t->id && t->levels) {
++            char name[64];
++            FILE *f;
++            snprintf(name, sizeof name, "tex_%u.bin", t->id);
++            if ((f = fopen(name, "wb")) != NULL) {
++                fwrite(bytes, 1, levels[0].bytes, f);
++                fclose(f);
++            }
++            fprintf(stderr, "[texture %u] %ux%u format 0x%02X pitch %u rows %u -> %s\n",
++                    t->id, t->width, t->height, t->format, levels[0].pitch,
++                    levels[0].rows, name);
++        }
++    }
++
+     /* An id seen again is the same texture written again (a later loop, or a
+      * writer that re-emits): replace it. */
+     release_slot(slot);
+@@ -724,6 +770,14 @@ static void do_draw_indexed_up(Replay *r, const D3D8CapChunk *c)
+                 d->num_vertices, d->min_index, d->vertex_bytes,
+                 ix[0], ix[1], ix[2], ix[3],
+                 ix[0], f[0], f[1], f[2], f[3], ix[1], g[0], g[1], g[2], g[3]);
++        {
++            const uint32_t *w = (const uint32_t *)f;
++            uint32_t k;
++            fprintf(stderr, "[draw %4ld] v[%u] raw", g_draw_index - 1, ix[0]);
++            for (k = 0; k < d->stride / 4u && k < 16u; k++)
++                fprintf(stderr, " %08X", w[k]);
++            fprintf(stderr, "\n");
++        }
+     }
+     if (FAILED(r->dev->lpVtbl->DrawIndexedPrimitiveUP(
+             r->dev, (D3DPRIMITIVETYPE)d->prim_type, d->min_index, d->num_vertices,
+@@ -945,6 +999,11 @@ static void replay_chunk(Replay *r, const D3D8CapChunk *c)
+                     p->first_reg + 1, p->count > 1 ? data[4] : 0.f,
+                     p->count > 1 ? data[5] : 0.f, p->count > 1 ? data[6] : 0.f,
+                     p->count > 1 ? data[7] : 0.f);
++            /* REPLAY_ALL_CONSTANTS=1: every register of a bulk upload. */
++            if (p->count > 2 && getenv("REPLAY_ALL_CONSTANTS"))
++                for (i = 0; i < p->count; i++)
++                    fprintf(stderr, "[constants]   c%u = %g %g %g %g\n", p->first_reg + i,
++                            data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+         }
+         d3d8_vsh_set_constant((int)p->first_reg, data, (int)p->count);
+         break;
+@@ -969,6 +1028,9 @@ static void replay_chunk(Replay *r, const D3D8CapChunk *c)
+             r->malformed++;
+             break;
+         }
++        if (g_list_draws)
++            fprintf(stderr, "[vertex data] v%d = %g %g %g %g\n", (int)p->reg,
++                    p->value[0], p->value[1], p->value[2], p->value[3]);
+         d3d8_vsh_set_vertex_data((int)p->reg, p->value);
+         break;
+     }
+@@ -1077,7 +1139,11 @@ int main(int argc, char **argv)
+         else if (!strcmp(argv[i], "--draws") && i + 1 < argc)
+             g_max_draws = atol(argv[++i]);
+         else if (!strcmp(argv[i], "--skip-draw") && i + 1 < argc)
+-            g_skip_draw = atol(argv[++i]);
++            {
++                char *end;
++                g_skip_draw = strtol(argv[++i], &end, 10);
++                g_skip_last = *end == '-' ? strtol(end + 1, NULL, 10) : g_skip_draw;
++            }
+         else if (!strcmp(argv[i], "--list-draws"))
+             g_list_draws = 1;
+         else if (argv[i][0] == '-') {
+@@ -1124,6 +1190,7 @@ int main(int argc, char **argv)
+     d3d = xbox_Direct3DCreate8(0);
+     hr = d3d ? d3d->lpVtbl->CreateDevice(d3d, 0, 1 /* HAL */, hwnd, 0, &pp, &r.dev)
+              : E_FAIL;
++    g_dev = r.dev;
+     if (FAILED(hr) || !r.dev) {
+         fprintf(stderr, "[replay] CreateDevice failed (0x%08lX)\n", (unsigned long)hr);
+         d3d8cap_close_read(cap);

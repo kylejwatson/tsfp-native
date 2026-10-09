@@ -41,13 +41,26 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 3. Sepia world: FP's final combiner is `fog.a, fog.rgb, r0` (0x13030C00), opposite to the XDK default; fog-disabled now means "no fog" for either lerp form (`d3d8_combiners.c`).
 4. Green/yellow icons: L8/A8L8/AL8/L16 textures are expanded to BGRA (L,L,L,A) at upload (`d3d8_resources.c`).
 5. Background input: keyboard/pad gated on window focus (`input_bindings.c`).
+6. Audio too fast/high: streams are created at 44.1 kHz but FP calls `IDirectSoundStream_SetFormat` per file (menu music 32 kHz stereo, level audio 22042 Hz). `CDirectSoundStream_SetFormat` is now replaced (`hle_dsound_stream.c`, `[DSOUND] ... SetFormat:` log lines).
+7. Vertex constants written straight into the push buffer (0x1EA4 load + 0x0B80 data, ~4M registers/min in level 1) are replayed to the host by the push walker (`hle_d3d8_push.c`), and the walk now runs before *every* shadow draw (`shadow_sync_push` in `hle_d3d8.c`), not only at EndPush.
+8. Keyboard sticks: `config/input_bindings.json`, copied beside the exe (`build/input_bindings.json`); the exe now also looks beside itself, not just the working directory. WASD = left stick, IJKL = right stick, Space/Z = A, X = B, C = X, V = Y, E/O = L trigger, R/U = R trigger, Q = White, F = Black, LShift/P = stick clicks. (A copy written to `%APPDATA%` from a Claude shell did not reach the user's real profile.)
+9. Stale audio: FP stops streams with Pause + `FlushEx` (not intercepted before), so old packets played after the next resume. `CDirectSoundStream_FlushEx` is replaced. `RECOMP_DSOUND_TRACE=1` logs every stream call with timestamps.
+10. Blown-out particles (space smoke, dust): NV2A `EXP`/`LOG` are expp/logp (four different components); the translator returned `exp2(x)` everywhere. FP's particle program uses `EXP.y` as frac() for a spin angle. Fixed in `d3d8_vsh.c` and the CPU interpreter `kernel/nv2a_vsh.c`.
+11. Dust storm covering the level ("sepia"): vertex programs output `float4 oT0..3` but both pixel shaders take `float3` texcoords with `float fog` packed into TEXCOORD3's `.w`, so every program draw read its fog from `oT3.w` (a constant ~3 → fully fogged). Program VS_OUT texcoords are float3 now.
+
+12. No sound effects (menu clicks, guns, damage): XDK 5849 moved the DirectSound buffer settings 4 bytes later (data +0xBC, size +0xC0, loop +0xCC/+0xD0; read from the game's own `CDirectSoundBufferSettings_SetBufferData`/`SetLoopRegion`). With the 5344 offsets every ADPCM buffer's "size" was a pointer, so none got a model. `hle_dsound.c` now reads the DSOUND build from the XBE header's library table (`[DSOUND] library build 5849: buffer settings at +0xBC`).
+13. Push-buffer gather (`hle_d3d8_push.c`) is used whenever a declared attribute's NV2A array is not where the stream 0 view says, not only when the stride is too small.
+14. Unfed vertex attributes: NV2A leaves each enabled attribute's current value at the last vertex a draw fetched (xemu models it the same way); the host left them at (0,0,0,1). FP's programs take colour from v2 and many draws feed no v2, so visors/glows were black blobs and whole character bodies were missing. `hle_d3d8_push_after_draw` now forwards those values; the walker also decodes `SET_VERTEX_DATA*`. Side effect seen once: a bright rectangle in the first fade-in frame of level 1.
+
+Replay tool additions: `--list-draws` prints fog states, raw vertex dwords and recorded vertex data; `REPLAY_ALL_CONSTANTS=1`, `REPLAY_TEX_DUMP=<id>` (writes `tex_<id>.bin`), `REPLAY_NO_CULL=1`, `REPLAY_NO_Z=1`; `RECOMP_D3D8_PS_SHOW=fograw`. `RECOMP_HLE_D3D8_ARRAY_CHECK=1` compares declarations with NV2A arrays (they agreed in level 1). `RECOMP_HLE_D3D8_ARRAY_TRACE=<stride>|1` (+ `_AFTER=<ms>`) prints declaration vs hardware arrays per draw. Replay: `--list-draws` shows each draw's program hash (`prog`, matches `RECOMP_D3D8_VS_DUMP=1` output), `REPLAY_SHOW_CONSTANTS=<first>[,<n>]`, `--skip-draw a-b`. Push dump reports hardware draw count (it matched intercepted draws).
 
 ## Open issues (next steps)
 
-- **Audio "sped up"** (user report). Measured: everything audible is ONE stereo 44.1 kHz Xbox-ADPCM DirectSound stream (music+dialog), decoded per spec, fed in real time at the rate the game declares; the game never calls stream SetFrequency. So the data path looks right. Unconfirmed by ear — ask the user to compare `audio_check_menu_music.wav` with the real game, or try `RECOMP_DSOUND_STREAM_RATE=32000`. The emulated APU (`src/apu`) is effectively silent (its XAudio2 path only outputs the unused software mixer); the looping ADPCM *buffers* (`format 04010069`, "not modelled", garbage size from `setting(SET_SIZE)`) are never voiced — dialog/SFX may be missing because of that.
-- Canyon walls in level 1 look flat/untextured (ground and guns are fine) — likely a second texture stage or a combiner input; start with a capture + `PS_SHOW`.
+- Audio ~1 s ahead of visuals (user, before fix 9) — re-check by ear. Frame pacing measured fine (30 fps logic, 60 swaps/s in real time). The emulated APU (`src/apu`) is effectively silent; the looping ADPCM *buffers* (`format 04010069`, "not modelled") are never voiced — SFX may be missing because of that.
+- Frequent yellow/black flashing in level 1 (user) — not seen in 7 sampled frames after fix 11; re-check.
+- Models missing geometry / mispositioned (user, after fix 7's first version) — re-check after the per-draw push sync.
 - Main-menu animated background goes black after the profile screen; arcade character-select 3D models (user report, not re-checked since the vertex-array fix).
-- Arcade mode load crash (user report, not re-tested after the level-load fixes).
+- Arcade mode no longer crashes (user, Oct 2026).
 - XMV movies are skipped (toolkit built without `third_party/ffmpeg`).
 - PS5 controller: XInput only; needs Steam Input/DS4Windows, or a HID backend in `src/input`.
 
