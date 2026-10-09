@@ -58,13 +58,15 @@ Replay tool additions: `--list-draws` prints fog states, raw vertex dwords and r
 
 ## Open issues (next steps)
 
-- Audio ~1 s ahead of visuals (user, before fix 9) — re-check by ear. Frame pacing measured fine (30 fps logic, 60 swaps/s in real time). The emulated APU (`src/apu`) is effectively silent; the looping ADPCM *buffers* (`format 04010069`, "not modelled") are never voiced — SFX may be missing because of that.
-- Frequent yellow/black flashing in level 1 (user) — not seen in 7 sampled frames after fix 11; re-check.
-- Models missing geometry / mispositioned (user, after fix 7's first version) — re-check after the per-draw push sync.
-- Main-menu animated background goes black after the profile screen; arcade character-select 3D models (user report, not re-checked since the vertex-array fix).
-- Arcade mode no longer crashes (user, Oct 2026).
+- Cutscene/in-game audio "mis-timed" (user, before fixes 12-15). Measured: the cutscene stream starts at the game's un-pause and completes 2048 ms packets 2.03-2.06 s apart; swaps steady at 60/s (30 fps logic, swaps in pairs); runtime shader compiles in the cutscene ~50 ms. Dialogue/SFX are ADPCM buffers, silent until fix 12, so re-check by ear first. `RECOMP_DSOUND_TRACE=1` lines the stream up against time.
+- Black screen after some checkpoints (user). Not reproduced; a candidate is a full-screen pass coloured from an unfed register (black before fix 14).
+- Scrolling floor/wallpaper in Challenge "Brain Drain" (user). Not visible in a 1.5 s still-camera capture after fix 15; ask for where/when.
+- Stray triangles at a marine's shoulders in level 1 (seen once, before fix 15); bright rectangle in the first fade-in frame of level 1 (fix 14 side effect).
+- Main-menu animated background goes black after the profile screen (not re-checked).
 - XMV movies are skipped (toolkit built without `third_party/ffmpeg`).
 - PS5 controller: XInput only; needs Steam Input/DS4Windows, or a HID backend in `src/input`.
+
+Inputs for the challenge: `14000:a,17000:down+a,21000:down,22000:down,23500:a,27000:a,30000:a,33000:a,36000:a,39000:a` reaches Brain Drain gameplay (~45 s). Arcade character select: `14000:a,17000:down+a,21000:down,22500:a,26000:a,30000:a,34000:a,38000:a` (Cortez at ~42 s).
 
 ## Gotchas
 
