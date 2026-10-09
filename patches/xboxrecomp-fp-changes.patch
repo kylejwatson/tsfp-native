@@ -336,10 +336,10 @@ index d7b3440..5abdae5 100644
      buffer.AudioBytes = bytes;
      buffer.pAudioData = owned.data;
 diff --git a/src/hle/hle_d3d8.c b/src/hle/hle_d3d8.c
-index c36f128..b84ef7f 100644
+index c36f128..93f9fa2 100644
 --- a/src/hle/hle_d3d8.c
 +++ b/src/hle/hle_d3d8.c
-@@ -623,6 +623,24 @@ struct shadow_program {
+@@ -623,6 +623,26 @@ struct shadow_program {
  #define NO_FIRST_VERTEX 0xFFFFFFFFu
  static uint32_t g_draw_first = NO_FIRST_VERTEX;
  void hle_d3d8_shadow_set_first_vertex(uint32_t first) { g_draw_first = first; }
@@ -355,16 +355,92 @@ index c36f128..b84ef7f 100644
 + * matrices. */
 +void hle_d3d8_push_sync(void);
 +void hle_d3d8_push_check_declaration(uint32_t object);
++static void shadow_sync_program(void);
 +static void shadow_sync_push(void)
 +{
 +    hle_d3d8_push_sync();
++    shadow_sync_program();
 +    hle_d3d8_push_check_declaration(hle_d3d8_shadow_program_object());
 +}
 +
  /* From hle_d3d8_vertex.c: vertex `first` of stream `stream`, or NULL. */
  const void *hle_d3d8_stream_vertices(uint32_t stream, uint32_t first, uint32_t vertices,
                                       uint32_t *stride);
-@@ -839,6 +857,11 @@ static void note_draw_format(uint32_t xpt, uint32_t stride)
+@@ -718,6 +738,73 @@ static int slot_program_cached(DWORD host)
+ 
+ static void shadow_read_declaration(int slot, uint32_t handle);
+ 
++/* A host program for this microcode: the cached one, or a new one added to
++ * the cache. 0 if it could not be made. */
++static DWORD slot_program_host(const DWORD *microcode, int count, int *created)
++{
++    uint32_t hash = microcode_hash(microcode, count);
++    int i = slot_program_find(hash, count, microcode);
++    DWORD host = 0;
++
++    *created = 0;
++    if (i >= 0) {
++        g_slot_reloads++;
++        return g_slot_programs[i].host;
++    }
++    if (FAILED(host_vsh_create_shader(microcode, count, &host)))
++        return 0;
++    *created = 1;
++    if (g_slot_program_count < SLOT_PROGRAM_CACHE) {
++        SlotProgram *sp = &g_slot_programs[g_slot_program_count++];
++        sp->hash = hash;
++        sp->count = count;
++        sp->host = host;
++    }
++    return host;
++}
++
++/* hle_d3d8_push.c: the program the hardware runs next, from the push buffer. */
++int hle_d3d8_push_program(const uint32_t **microcode, int *count);
++static unsigned long g_push_program_swaps;
++
++/* Before a draw: if the program the push buffer started is not the one the
++ * selected shader carries, draw with the push buffer's, under the selected
++ * object's declaration. A title that loads programs into the transform slots
++ * itself (FP's skinning) is otherwise drawn with the last program the XDK
++ * selected. RECOMP_HLE_D3D8_PUSH_PROGRAM=0 turns it off. */
++static void shadow_sync_program(void)
++{
++    static int on = -1;
++    struct shadow_program *p;
++    const uint32_t *microcode;
++    int count, created;
++    DWORD host;
++
++    if (on < 0)
++        on = xbox_EnvSwitch("RECOMP_HLE_D3D8_PUSH_PROGRAM", 1);
++    if (!on || !g_shadow || !g_shadow_vs_is_program || g_shadow_vs_slot < 0 ||
++        g_shadow_vs_kind != SHADER_HOST_PROGRAM)
++        return;
++    p = &g_programs[g_shadow_vs_slot];
++    if (!hle_d3d8_push_program(&microcode, &count) ||
++        host_vsh_same_microcode(p->host, (const DWORD *)microcode, count))
++        return;
++    host = slot_program_host((const DWORD *)microcode, count, &created);
++    if (!host)
++        return;
++    if (created && g_push_program_swaps < 16)
++        fprintf(stderr, "[HLE-D3D8] shadow vertex shader 0x%08X: runs a program "
++                "the push buffer loaded (%d instructions)\n", g_shadow_vs, count);
++    g_push_program_swaps++;
++    /* The entry now names a cached program, which must outlive it. */
++    if (!p->from_slot && !slot_program_cached(p->host))
++        host_vsh_delete_shader(p->host);
++    p->host = host;
++    p->from_slot = 1;
++    shadow_read_declaration(g_shadow_vs_slot, g_shadow_vs);
++    host_SetVertexShader(g_shadow, host);
++}
++
+ static void shadow_select_vertex_shader(uint32_t handle, uint32_t address)
+ {
+     int i;
+@@ -839,6 +926,11 @@ static void note_draw_format(uint32_t xpt, uint32_t stride)
      }
  }
  
@@ -376,7 +452,7 @@ index c36f128..b84ef7f 100644
  /* Common checks for a draw under the current vertex shader. */
  static int shadow_can_draw(uint32_t xpt, uint32_t stride)
  {
-@@ -862,6 +885,27 @@ static int shadow_can_draw(uint32_t xpt, uint32_t stride)
+@@ -862,6 +954,27 @@ static int shadow_can_draw(uint32_t xpt, uint32_t stride)
              return 0;
          }
          if (stride < p->extent) {        /* the layout would read past a vertex */
@@ -404,7 +480,7 @@ index c36f128..b84ef7f 100644
              g_draws_stride++;
              return 0;
          }
-@@ -1988,6 +2032,16 @@ static void shadow_read_declaration(int slot, uint32_t handle)
+@@ -1988,6 +2101,16 @@ static void shadow_read_declaration(int slot, uint32_t handle)
          n++;
      }
  
@@ -421,7 +497,7 @@ index c36f128..b84ef7f 100644
      if (!refused && n > 0 && SUCCEEDED(host_vsh_set_declaration(p->host, in, n))) {
          p->has_declaration = 1;
          p->packed_count = packed;
-@@ -3375,6 +3429,7 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
+@@ -3375,6 +3498,7 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
  
      if (!g_shadow || !verts || !stride || !count)
          return;
@@ -429,7 +505,7 @@ index c36f128..b84ef7f 100644
      if (!shadow_can_draw(xpt, stride))
          return;
      if (!xbox_primitive_to_host(xpt, count, &pt, &prims)) {
-@@ -3432,6 +3487,7 @@ void hle_d3d8_shadow_draw_indexed(uint32_t xpt, uint32_t count, const uint16_t *
+@@ -3432,6 +3556,7 @@ void hle_d3d8_shadow_draw_indexed(uint32_t xpt, uint32_t count, const uint16_t *
  
      if (!g_shadow || !idx || !verts || !stride || !count)
          return;
@@ -439,10 +515,10 @@ index c36f128..b84ef7f 100644
      if (!xbox_primitive_to_host(xpt, count, &pt, &prims)) {
 diff --git a/src/hle/hle_d3d8_push.c b/src/hle/hle_d3d8_push.c
 new file mode 100644
-index 0000000..a5a12f0
+index 0000000..e4099ba
 --- /dev/null
 +++ b/src/hle/hle_d3d8_push.c
-@@ -0,0 +1,570 @@
+@@ -0,0 +1,627 @@
 +/*
 + * hle_d3d8_push.c -- the NV2A vertex arrays, read from the push buffer.
 + *
@@ -488,6 +564,7 @@ index 0000000..a5a12f0
 +
 +#define PUSH_MAX_METHODS 512
 +#define NV_ATTRS 16
++#define NV2A_PROGRAM_SLOTS 136u
 +#define CONTIG_BASE 0x80000000u
 +#define CONTIG_SIZE (64u * 1024u * 1024u)
 +
@@ -635,8 +712,64 @@ index 0000000..a5a12f0
 +    }
 +}
 +
++/* The transform program memory, as the push buffer fills it: SET_TRANSFORM_
++ * PROGRAM_LOAD (0x1E9C) points at a slot, SET_TRANSFORM_PROGRAM (0x0B00..
++ * 0x0B7C) streams four words per instruction into it, and SET_TRANSFORM_
++ * PROGRAM_START (0x1EA0) says where the next draw begins. FP loads its
++ * skinning programs this way, itself, so the host kept transforming its
++ * characters with whatever program the XDK had last selected: palette-skinned
++ * vertices (a bone offset of -24/-28/-32 in v0) went through a rigid
++ * program, and bodies, the character-select models and the first-person
++ * shotgun came apart. A slot loaded before the first walk is unknown. */
++static uint32_t g_prog_mem[NV2A_PROGRAM_SLOTS][4], g_prog_words[4];
++static uint8_t  g_prog_known[NV2A_PROGRAM_SLOTS];
++static uint32_t g_prog_load, g_prog_start = NV2A_PROGRAM_SLOTS;
++
++static void track_program(uint32_t method, uint32_t value)
++{
++    if (method == 0x1E9Cu) {
++        g_prog_load = value;
++    } else if (method == 0x1EA0u) {
++        g_prog_start = value;
++    } else {
++        uint32_t k = ((method - 0x0B00u) / 4u) & 3u;
++        g_prog_words[k] = value;
++        if (k == 3u) {
++            if (g_prog_load < NV2A_PROGRAM_SLOTS) {
++                memcpy(g_prog_mem[g_prog_load], g_prog_words, sizeof g_prog_words);
++                g_prog_known[g_prog_load] = 1;
++            }
++            g_prog_load++;
++        }
++    }
++}
++
++/* The program the next draw runs: from the start slot to the instruction
++ * with the final bit (bit 96, word 3 bit 0). 0 when any of it is unknown. */
++int hle_d3d8_push_program(const uint32_t **microcode, int *count)
++{
++    uint32_t slot;
++
++    if (g_prog_start >= NV2A_PROGRAM_SLOTS)
++        return 0;
++    for (slot = g_prog_start; slot < NV2A_PROGRAM_SLOTS; slot++) {
++        if (!g_prog_known[slot])
++            return 0;
++        if (g_prog_mem[slot][3] & 1u) {
++            *microcode = g_prog_mem[g_prog_start];
++            *count = (int)(slot - g_prog_start + 1u);
++            return 1;
++        }
++    }
++    return 0;
++}
++
 +static void track(uint32_t method, uint32_t value)
 +{
++    if (method == 0x1E9Cu || method == 0x1EA0u || (method >= 0x0B00u && method < 0x0B80u)) {
++        track_program(method, value);
++        return;
++    }
 +    if (method >= 0x1880u && method < 0x1B00u) {
 +        track_vertex_data(method, value);
 +        return;
