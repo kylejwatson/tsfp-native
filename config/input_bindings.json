@@ -1,0 +1,29 @@
+{
+  "controllers": [
+    {
+      "port": 1,
+      "bindings": {
+        "lstick_up":    ["pad:ly+", "key:W"],
+        "lstick_down":  ["pad:ly-", "key:S"],
+        "lstick_left":  ["pad:lx-", "key:A"],
+        "lstick_right": ["pad:lx+", "key:D"],
+        "lthumb":       ["pad:lthumb", "key:LSHIFT"],
+
+        "rstick_up":    ["pad:ry+", "key:I"],
+        "rstick_down":  ["pad:ry-", "key:K"],
+        "rstick_left":  ["pad:rx-", "key:J"],
+        "rstick_right": ["pad:rx+", "key:L"],
+        "rthumb":       ["pad:rthumb", "key:P"],
+
+        "a":            ["pad:a", "key:Z", "key:SPACE"],
+        "b":            ["pad:b", "key:X"],
+        "x":            ["pad:x", "key:C"],
+        "y":            ["pad:y", "key:V"],
+        "white":        ["pad:rshoulder", "key:Q"],
+        "black":        ["pad:lshoulder", "key:F"],
+        "ltrigger":     ["pad:lt", "key:E", "key:O"],
+        "rtrigger":     ["pad:rt", "key:R", "key:U"]
+      }
+    }
+  ]
+}

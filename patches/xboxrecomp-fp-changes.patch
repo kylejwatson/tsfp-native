@@ -1,3 +1,233 @@
+diff --git a/src/d3d/CMakeLists.txt b/src/d3d/CMakeLists.txt
+index 3a19982..3e4a90e 100644
+--- a/src/d3d/CMakeLists.txt
++++ b/src/d3d/CMakeLists.txt
+@@ -13,6 +13,7 @@ if(WIN32)
+         d3d8_overlay.c
+         d3d8_movie.c
+         d3d8_screencopy.c
++        d3d8_clearmask.c
+         d3d8_display.c
+     )
+     # gdi32: the overlay renders its text with GDI rather than an embedded font.
+diff --git a/src/d3d/d3d8_clearmask.c b/src/d3d/d3d8_clearmask.c
+new file mode 100644
+index 0000000..247c70a
+--- /dev/null
++++ b/src/d3d/d3d8_clearmask.c
+@@ -0,0 +1,212 @@
++/*
++ * d3d8_clearmask.c -- a colour clear limited to some channels.
++ *
++ * The Xbox splits D3DCLEAR_TARGET into one bit per channel (0x10 R, 0x20 G,
++ * 0x40 B, 0x80 A), so a title can clear alpha alone and keep the picture.
++ * TimeSplitters: Future Perfect does that before its on-screen control hints
++ * and its shimmering cloaked creatures, to build a destination-alpha mask
++ * over the finished scene. Treated as a whole clear, the scene went black
++ * behind every hint.
++ *
++ * D3D11 cannot clear part of a pixel, so this is a draw: one oversized
++ * triangle whose pixel shader returns 1, blended as BLEND_FACTOR * 1 with the
++ * clear colour as the blend factor, through a write mask of the channels
++ * asked for. No constant buffer, and no texture or sampler is touched. Clear
++ * rectangles, if any, are scissor rectangles here.
++ *
++ * Like the screen copy, this binds its own shaders and states and puts back
++ * only the render targets, viewports and scissors: every draw binds the
++ * rest again.
++ */
++#include "d3d8_internal.h"
++#include "d3d8_xbox.h"
++
++#include <d3dcompiler.h>
++#include <stdio.h>
++#include <string.h>
++
++static struct {
++    int                      tried, failed;
++    ID3D11VertexShader      *vs;
++    ID3D11PixelShader       *ps;
++    ID3D11BlendState        *blend[16];   /* by D3D11 write mask */
++    ID3D11DepthStencilState *depth;
++    ID3D11RasterizerState   *raster;      /* scissor on */
++} g;
++
++static const char kSource[] =
++    "float4 vs_main(uint id : SV_VertexID) : SV_Position {\n"
++    "    float2 c = float2((id << 1) & 2, id & 2);\n"   /* one oversized triangle */
++    "    return float4(c * float2(2, -2) + float2(-1, 1), 0, 1);\n"
++    "}\n"
++    "float4 ps_main() : SV_Target { return 1; }\n";
++
++static void fail(const char *what, HRESULT hr)
++{
++    g.failed = 1;
++    fprintf(stderr, "D3D8 channel clear: %s failed (0x%08lX); a clear of some "
++            "channels clears all four\n", what, (unsigned long)hr);
++    fflush(stderr);
++}
++
++static int compile(ID3D11Device *dev, const char *entry, const char *target, void **out)
++{
++    ID3DBlob *code = NULL, *err = NULL;
++    HRESULT hr = D3DCompile(kSource, sizeof kSource - 1, "clearmask", NULL, NULL,
++                            entry, target, 0, 0, &code, &err);
++    if (FAILED(hr)) {
++        if (err) {
++            fprintf(stderr, "D3D8 channel clear: %s\n",
++                    (const char *)ID3D10Blob_GetBufferPointer(err));
++            ID3D10Blob_Release(err);
++        }
++        fail("D3DCompile", hr);
++        return 0;
++    }
++    if (err) ID3D10Blob_Release(err);
++    if (target[0] == 'v')
++        hr = ID3D11Device_CreateVertexShader(dev, ID3D10Blob_GetBufferPointer(code),
++                                             ID3D10Blob_GetBufferSize(code), NULL,
++                                             (ID3D11VertexShader **)out);
++    else
++        hr = ID3D11Device_CreatePixelShader(dev, ID3D10Blob_GetBufferPointer(code),
++                                            ID3D10Blob_GetBufferSize(code), NULL,
++                                            (ID3D11PixelShader **)out);
++    ID3D10Blob_Release(code);
++    if (FAILED(hr)) { fail("CreateShader", hr); return 0; }
++    return 1;
++}
++
++static int create(void)
++{
++    ID3D11Device *dev = d3d8_GetD3D11Device();
++    D3D11_DEPTH_STENCIL_DESC ds;
++    D3D11_RASTERIZER_DESC rd;
++    HRESULT hr;
++
++    if (g.failed) return 0;
++    if (g.tried) return g.ps != NULL;
++    g.tried = 1;
++    if (!dev) { g.failed = 1; return 0; }
++    if (!compile(dev, "vs_main", "vs_4_0", (void **)&g.vs) ||
++        !compile(dev, "ps_main", "ps_4_0", (void **)&g.ps))
++        return 0;
++
++    memset(&ds, 0, sizeof ds);
++    hr = ID3D11Device_CreateDepthStencilState(dev, &ds, &g.depth);
++    if (FAILED(hr)) { fail("CreateDepthStencilState", hr); return 0; }
++
++    memset(&rd, 0, sizeof rd);
++    rd.FillMode = D3D11_FILL_SOLID;
++    rd.CullMode = D3D11_CULL_NONE;
++    rd.DepthClipEnable = TRUE;
++    rd.ScissorEnable = TRUE;
++    hr = ID3D11Device_CreateRasterizerState(dev, &rd, &g.raster);
++    if (FAILED(hr)) { fail("CreateRasterizerState", hr); return 0; }
++    return 1;
++}
++
++static ID3D11BlendState *blend_for(UINT mask)
++{
++    ID3D11Device *dev = d3d8_GetD3D11Device();
++    D3D11_BLEND_DESC bl;
++
++    if (g.blend[mask])
++        return g.blend[mask];
++    memset(&bl, 0, sizeof bl);
++    bl.RenderTarget[0].BlendEnable = TRUE;
++    bl.RenderTarget[0].SrcBlend = D3D11_BLEND_BLEND_FACTOR;
++    bl.RenderTarget[0].DestBlend = D3D11_BLEND_ZERO;
++    bl.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
++    bl.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_BLEND_FACTOR;
++    bl.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
++    bl.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
++    bl.RenderTarget[0].RenderTargetWriteMask = (UINT8)mask;
++    if (FAILED(ID3D11Device_CreateBlendState(dev, &bl, &g.blend[mask])))
++        g.blend[mask] = NULL;
++    return g.blend[mask];
++}
++
++BOOL d3d8_ClearChannels(ID3D11RenderTargetView *rtv, UINT xbox_channels,
++                        const float color[4], UINT rect_count, const D3D11_RECT *rects)
++{
++    ID3D11DeviceContext *ctx = d3d8_GetD3D11Context();
++    ID3D11RenderTargetView *saved_rtv = NULL;
++    ID3D11DepthStencilView *saved_dsv = NULL;
++    D3D11_VIEWPORT saved_vp[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE];
++    UINT saved_vps = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
++    D3D11_RECT saved_sc[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE];
++    UINT saved_scs = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
++    ID3D11Resource *res = NULL;
++    D3D11_TEXTURE2D_DESC td;
++    D3D11_VIEWPORT vp;
++    D3D11_RECT whole;
++    ID3D11BlendState *blend;
++    UINT mask = 0, i;
++
++    if (xbox_channels & 0x10) mask |= D3D11_COLOR_WRITE_ENABLE_RED;
++    if (xbox_channels & 0x20) mask |= D3D11_COLOR_WRITE_ENABLE_GREEN;
++    if (xbox_channels & 0x40) mask |= D3D11_COLOR_WRITE_ENABLE_BLUE;
++    if (xbox_channels & 0x80) mask |= D3D11_COLOR_WRITE_ENABLE_ALPHA;
++    if (!mask)
++        return TRUE;                     /* nothing asked for */
++    if (!ctx || !rtv || !create() || !(blend = blend_for(mask)))
++        return FALSE;
++
++    ID3D11RenderTargetView_GetResource(rtv, &res);
++    if (!res)
++        return FALSE;
++    ID3D11Texture2D_GetDesc((ID3D11Texture2D *)res, &td);
++    ID3D11Resource_Release(res);
++
++    ID3D11DeviceContext_RSGetViewports(ctx, &saved_vps, saved_vp);
++    ID3D11DeviceContext_RSGetScissorRects(ctx, &saved_scs, saved_sc);
++    ID3D11DeviceContext_OMGetRenderTargets(ctx, 1, &saved_rtv, &saved_dsv);
++
++    vp.TopLeftX = vp.TopLeftY = 0.0f;
++    vp.Width = (float)td.Width;
++    vp.Height = (float)td.Height;
++    vp.MinDepth = 0.0f;
++    vp.MaxDepth = 1.0f;
++    whole.left = whole.top = 0;
++    whole.right = (LONG)td.Width;
++    whole.bottom = (LONG)td.Height;
++    if (!rect_count) {
++        rects = &whole;
++        rect_count = 1;
++    }
++
++    ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &rtv, NULL);
++    ID3D11DeviceContext_RSSetViewports(ctx, 1, &vp);
++    ID3D11DeviceContext_IASetInputLayout(ctx, NULL);
++    ID3D11DeviceContext_IASetPrimitiveTopology(ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
++    ID3D11DeviceContext_VSSetShader(ctx, g.vs, NULL, 0);
++    ID3D11DeviceContext_PSSetShader(ctx, g.ps, NULL, 0);
++    ID3D11DeviceContext_OMSetBlendState(ctx, blend, color, 0xFFFFFFFF);
++    ID3D11DeviceContext_OMSetDepthStencilState(ctx, g.depth, 0);
++    ID3D11DeviceContext_RSSetState(ctx, g.raster);
++    for (i = 0; i < rect_count; i++) {
++        ID3D11DeviceContext_RSSetScissorRects(ctx, 1, &rects[i]);
++        ID3D11DeviceContext_Draw(ctx, 3, 0);
++    }
++
++    ID3D11DeviceContext_OMSetRenderTargets(ctx, 1, &saved_rtv, saved_dsv);
++    if (saved_vps)
++        ID3D11DeviceContext_RSSetViewports(ctx, saved_vps, saved_vp);
++    ID3D11DeviceContext_RSSetScissorRects(ctx, saved_scs, saved_scs ? saved_sc : NULL);
++    if (saved_rtv) ID3D11RenderTargetView_Release(saved_rtv);
++    if (saved_dsv) ID3D11DepthStencilView_Release(saved_dsv);
++    return TRUE;
++}
++
++void d3d8_ClearChannelsShutdown(void)
++{
++    UINT i;
++    if (g.vs)     { ID3D11VertexShader_Release(g.vs);       g.vs = NULL; }
++    if (g.ps)     { ID3D11PixelShader_Release(g.ps);        g.ps = NULL; }
++    for (i = 0; i < 16; i++)
++        if (g.blend[i]) { ID3D11BlendState_Release(g.blend[i]); g.blend[i] = NULL; }
++    if (g.depth)  { ID3D11DepthStencilState_Release(g.depth); g.depth = NULL; }
++    if (g.raster) { ID3D11RasterizerState_Release(g.raster);  g.raster = NULL; }
++    g.tried = g.failed = 0;
++}
 diff --git a/src/d3d/d3d8_combiners.c b/src/d3d/d3d8_combiners.c
 index a795bfd..70e96b6 100644
 --- a/src/d3d/d3d8_combiners.c
@@ -54,6 +284,98 @@ index a795bfd..70e96b6 100644
          } else if (show && strcmp(show, "fogon") == 0) {  /* fog enabled: white */
              EMIT("    result.rgb = fog_enable ? 1.0 : 0.0;\n");
              EMIT("    result.a = 1.0;\n");
+diff --git a/src/d3d/d3d8_device.c b/src/d3d/d3d8_device.c
+index 9ab644e..79f39f1 100644
+--- a/src/d3d/d3d8_device.c
++++ b/src/d3d/d3d8_device.c
+@@ -631,6 +631,7 @@ static ULONG __stdcall dev_Release(IDirect3DDevice8 *self)
+         d3d8_overlay_shutdown();
+         d3d8_movie_shutdown();
+         xbox_D3D8ScreenCopyShutdown();
++        d3d8_ClearChannelsShutdown();
+         d3d8_display_shutdown();
+         d3d8_vsh_shutdown();
+         d3d8_combiners_shutdown();
+@@ -787,6 +788,28 @@ static HRESULT __stdcall dev_EndScene(IDirect3DDevice8 *self)
+     return S_OK;
+ }
+ 
++/* The title's clear rectangles, guest pixels to host ones (scaled like the
++ * viewport), empty ones dropped. */
++static UINT scale_clear_rects(DWORD count, const D3DRECT *rects, D3D11_RECT out[16])
++{
++    float sx = rt_scale_x(), sy = rt_scale_y();
++    UINT n = 0;
++    DWORD i;
++
++    for (i = 0; rects && i < count && n < 16; i++) {
++        LONG x1 = rects[i].x1 < 0 ? 0 : rects[i].x1;
++        LONG y1 = rects[i].y1 < 0 ? 0 : rects[i].y1;
++        if (rects[i].x2 <= x1 || rects[i].y2 <= y1)
++            continue;
++        out[n].left   = (LONG)((float)x1 * sx);
++        out[n].top    = (LONG)((float)y1 * sy);
++        out[n].right  = (LONG)((float)rects[i].x2 * sx);
++        out[n].bottom = (LONG)((float)rects[i].y2 * sy);
++        n++;
++    }
++    return n;
++}
++
+ static HRESULT __stdcall dev_Clear(IDirect3DDevice8 *self, DWORD Count, const D3DRECT *pRects, DWORD Flags, D3DCOLOR Color, float Z, DWORD Stencil)
+ {
+     (void)self; (void)Count; (void)pRects; (void)Stencil;
+@@ -804,9 +827,30 @@ static HRESULT __stdcall dev_Clear(IDirect3DDevice8 *self, DWORD Count, const D3
+             ((Color >>  0) & 0xFF) / 255.0f,  /* B */
+             ((Color >> 24) & 0xFF) / 255.0f,  /* A */
+         };
+-        ID3D11DeviceContext_ClearRenderTargetView(g_device_state.d3d11_context,
+-                                                   rtv,
+-                                                   clear_color);
++        /* Two things the PC's Clear has no word for, both carried in from
++         * the Xbox call: rectangles, and a channel mask (Flags 0x10 R, 0x20
++         * G, 0x40 B, 0x80 A; none of them set means all four).
++         * TimeSplitters: Future Perfect clears alpha alone before its
++         * on-screen control hints, and a whole clear for that blacked out
++         * the game behind every hint. Either one is a masked draw
++         * (d3d8_clearmask.c). Depth and stencil below are still cleared
++         * whole: D3D11 cannot clear part of a depth view. */
++        UINT channels = Flags & D3D8_CLEAR_CHANNELS;
++        if (channels == D3D8_CLEAR_CHANNELS)
++            channels = 0;
++        if (channels || (Count && pRects)) {
++            D3D11_RECT r[16];
++            UINT n = scale_clear_rects(Count, pRects, r);
++
++            if ((Count && pRects && !n) ||
++                d3d8_ClearChannels(rtv, channels ? channels : D3D8_CLEAR_CHANNELS,
++                                   clear_color, n, r))
++                channels = D3D8_CLEAR_CHANNELS;   /* done */
++        }
++        if (channels != D3D8_CLEAR_CHANNELS)
++            ID3D11DeviceContext_ClearRenderTargetView(g_device_state.d3d11_context,
++                                                       rtv,
++                                                       clear_color);
+     }
+ 
+     if ((Flags & (D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL)) && dsv) {
+diff --git a/src/d3d/d3d8_internal.h b/src/d3d/d3d8_internal.h
+index e337433..fddfbf2 100644
+--- a/src/d3d/d3d8_internal.h
++++ b/src/d3d/d3d8_internal.h
+@@ -32,6 +32,12 @@ ID3D11Device        *d3d8_GetD3D11Device(void);
+ ID3D11DeviceContext *d3d8_GetD3D11Context(void);
+ IDXGISwapChain      *d3d8_GetSwapChain(void);
+ ID3D11RenderTargetView *d3d8_GetDefaultRTV(void);
++/* d3d8_clearmask.c: clear only the Xbox channels in xbox_channels (0x10 R,
++ * 0x20 G, 0x40 B, 0x80 A) of rtv, inside rects (host pixels) or everywhere.
++ * FALSE if it could not, and the caller clears the whole view. */
++BOOL d3d8_ClearChannels(ID3D11RenderTargetView *rtv, UINT xbox_channels,
++                        const float color[4], UINT rect_count, const D3D11_RECT *rects);
++void d3d8_ClearChannelsShutdown(void);
+ /* The host back buffer's size, which is what clip space maps onto. */
+ UINT                 d3d8_GetBackBufferWidth(void);
+ UINT                 d3d8_GetBackBufferHeight(void);
 diff --git a/src/d3d/d3d8_resources.c b/src/d3d/d3d8_resources.c
 index cef025d..c6bed20 100644
 --- a/src/d3d/d3d8_resources.c
@@ -286,6 +608,22 @@ index 8a9a88d..1338dee 100644
  /**
   * Give a program the vertex layout its declaration describes. Registers the
   * program reads are bound at these formats and offsets instead of being
+diff --git a/src/d3d/d3d8_xbox.h b/src/d3d/d3d8_xbox.h
+index 7cf1b54..8be854b 100644
+--- a/src/d3d/d3d8_xbox.h
++++ b/src/d3d/d3d8_xbox.h
+@@ -608,6 +608,11 @@ typedef enum D3DCLEAR_FLAGS {
+     D3DCLEAR_STENCIL = 0x04,
+ } D3DCLEAR_FLAGS;
+ 
++/* Not PC D3D8: the Xbox's per-channel target bits, carried alongside
++ * D3DCLEAR_TARGET (0x10 R, 0x20 G, 0x40 B, 0x80 A). None set means all
++ * four, as on the PC. dev_Clear honours them. */
++#define D3D8_CLEAR_CHANNELS 0xF0u
++
+ /* ================================================================
+  * Vertex declaration / FVF
+  * ================================================================ */
 diff --git a/src/hle/CMakeLists.txt b/src/hle/CMakeLists.txt
 index 1bf284a..d8edfda 100644
 --- a/src/hle/CMakeLists.txt
@@ -335,8 +673,34 @@ index d7b3440..5abdae5 100644
      XAUDIO2_BUFFER buffer{};
      buffer.AudioBytes = bytes;
      buffer.pAudioData = owned.data;
+diff --git a/src/hle/d3d8_xbox_map.h b/src/hle/d3d8_xbox_map.h
+index d0e3215..11e0cb2 100644
+--- a/src/hle/d3d8_xbox_map.h
++++ b/src/hle/d3d8_xbox_map.h
+@@ -25,16 +25,17 @@ enum {
+ 
+ /* Xbox D3DCLEAR_* bits: TARGET is 0xF0, one bit per channel (0x10 R, 0x20 G,
+  * 0x40 B, 0x80 A); ZBUFFER is 0x01 and STENCIL 0x02. The host layer takes the
+- * PC values. Two things are not honoured: a per-channel target mask (any
+- * target bit clears all four channels, as Cxbx-Reloaded also does) and clear
+- * rectangles, which the host dev_Clear ignores, so a rectangle-limited clear
+- * clears the whole target. */
++ * PC values, plus the channel bits as they are when only some are set
++ * (D3D8_CLEAR_CHANNELS): TimeSplitters: Future Perfect clears alpha alone,
++ * and clearing all four blacked out the game behind its control hints. */
+ static __inline DWORD xbox_clear_flags_to_host(uint32_t xbox_flags)
+ {
+     DWORD host = 0;
+ 
+     if (xbox_flags & 0xF0)
+         host |= D3DCLEAR_TARGET;
++    if ((xbox_flags & 0xF0) && (xbox_flags & 0xF0) != 0xF0)
++        host |= xbox_flags & 0xF0;
+     if (xbox_flags & 0x01)
+         host |= D3DCLEAR_ZBUFFER;
+     if (xbox_flags & 0x02)
 diff --git a/src/hle/hle_d3d8.c b/src/hle/hle_d3d8.c
-index c36f128..93f9fa2 100644
+index c36f128..574000c 100644
 --- a/src/hle/hle_d3d8.c
 +++ b/src/hle/hle_d3d8.c
 @@ -623,6 +623,26 @@ struct shadow_program {
@@ -480,7 +844,46 @@ index c36f128..93f9fa2 100644
              g_draws_stride++;
              return 0;
          }
-@@ -1988,6 +2101,16 @@ static void shadow_read_declaration(int slot, uint32_t handle)
+@@ -1427,6 +1540,11 @@ HLE_EXPORT(Direct3D_CreateDevice)
+                 HLE_MEM32(pp_va + 0x0), HLE_MEM32(pp_va + 0x4), HLE_MEM32(pp_va + 0x8),
+                 HLE_MEM32(pp_va + 0xC), g_swap_effect, HLE_MEM32(pp_va + 0x28),
+                 HLE_MEM32(pp_va + 0x2C), HLE_MEM32(pp_va + 0x30), g_eax);
++        /* The vblank comes at the mode's refresh (kernel_bridge.c). */
++        if ((int32_t)g_eax >= 0) {
++            extern void xbox_SetVblankRate(unsigned hz);
++            xbox_SetVblankRate(HLE_MEM32(pp_va + 0x2C));
++        }
+     }
+     if (!g_backbuffer_va)
+         fprintf(stderr, "[HLE-D3D8] CreateDevice set no render target; the back "
+@@ -1459,7 +1577,25 @@ HLE_EXPORT(D3DDevice_Clear)
+         if (g_shadow_clears < 4)
+             fprintf(stderr, "[HLE-D3D8] shadow Clear: flags 0x%08X color 0x%08X "
+                     "z %g stencil %u\n", flags, color, z, stencil);
+-        host_Clear(g_shadow, 0, NULL, xbox_clear_flags_to_host(flags), color, z, stencil);
++        /* The title's rectangles, D3DRECT { x1, y1, x2, y2 } in guest
++         * pixels: a boxed clear (FP's control hints) is not a full one. */
++        {
++            uint32_t count = HLE_ARG(0), rects_va = HLE_ARG(1), i;
++            D3DRECT rects[16];
++
++            if (count > 16)
++                count = 16;
++            if (!rects_va)
++                count = 0;
++            for (i = 0; i < count; i++) {
++                rects[i].x1 = (LONG)HLE_MEM32(rects_va + i * 16u);
++                rects[i].y1 = (LONG)HLE_MEM32(rects_va + i * 16u + 4u);
++                rects[i].x2 = (LONG)HLE_MEM32(rects_va + i * 16u + 8u);
++                rects[i].y2 = (LONG)HLE_MEM32(rects_va + i * 16u + 12u);
++            }
++            host_Clear(g_shadow, count, count ? rects : NULL,
++                       xbox_clear_flags_to_host(flags), color, z, stencil);
++        }
+         g_shadow_clears++;
+         g_shadow_last_color = color;
+         if (shadow_trace_on())
+@@ -1988,6 +2124,16 @@ static void shadow_read_declaration(int slot, uint32_t handle)
          n++;
      }
  
@@ -497,7 +900,7 @@ index c36f128..93f9fa2 100644
      if (!refused && n > 0 && SUCCEEDED(host_vsh_set_declaration(p->host, in, n))) {
          p->has_declaration = 1;
          p->packed_count = packed;
-@@ -3375,6 +3498,7 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
+@@ -3375,6 +3521,7 @@ void hle_d3d8_shadow_draw(uint32_t xpt, uint32_t count, const void *verts,
  
      if (!g_shadow || !verts || !stride || !count)
          return;
@@ -505,7 +908,7 @@ index c36f128..93f9fa2 100644
      if (!shadow_can_draw(xpt, stride))
          return;
      if (!xbox_primitive_to_host(xpt, count, &pt, &prims)) {
-@@ -3432,6 +3556,7 @@ void hle_d3d8_shadow_draw_indexed(uint32_t xpt, uint32_t count, const uint16_t *
+@@ -3432,6 +3579,7 @@ void hle_d3d8_shadow_draw_indexed(uint32_t xpt, uint32_t count, const uint16_t *
  
      if (!g_shadow || !idx || !verts || !stride || !count)
          return;
@@ -1146,6 +1549,19 @@ index 0000000..e4099ba
 +}
 +
 +#endif /* _WIN32 */
+diff --git a/src/hle/hle_d3d8_record.c b/src/hle/hle_d3d8_record.c
+index b9f91ae..6e3efbf 100644
+--- a/src/hle/hle_d3d8_record.c
++++ b/src/hle/hle_d3d8_record.c
+@@ -819,7 +819,7 @@ HRESULT host_Clear(IDirect3DDevice8 *dev, DWORD count, const D3DRECT *rects,
+         D3D8CapRect r[16];
+         DWORD i, n = rects ? count : 0;
+ 
+-        if (n > 16)                      /* src/hle passes none; more is a bug */
++        if (n > 16)                      /* src/hle passes at most 16 */
+             n = 16;
+         for (i = 0; i < n; i++) {
+             r[i].x1 = rects[i].x1;
 diff --git a/src/hle/hle_d3d8_vertex.c b/src/hle/hle_d3d8_vertex.c
 index c4d8f9c..f4711f8 100644
 --- a/src/hle/hle_d3d8_vertex.c
@@ -1701,6 +2117,84 @@ index ef22573..2cab81f 100644
          return 0;
      if (!g_key_state[vk])
          g_key_state[vk] = (GetAsyncKeyState(vk) & 0x8000) ? 2 : 1;
+diff --git a/src/kernel/kernel_bridge.c b/src/kernel/kernel_bridge.c
+index f20a440..6d64e5f 100644
+--- a/src/kernel/kernel_bridge.c
++++ b/src/kernel/kernel_bridge.c
+@@ -2602,6 +2602,31 @@ static void vblank_clock_configure(void)
+     fflush(stderr);
+ }
+ 
++/* The refresh the title asked D3D for (D3DPRESENT_PARAMETERS
++ * FullScreen_RefreshRateInHz), called from the CreateDevice replacement.
++ *
++ * The console's vblank comes at the rate of the mode the title set, and a
++ * title may count its game time in vblanks. TimeSplitters: Future Perfect is
++ * a PAL disc running 50 Hz: its frame clock is a counter its vertical-blank
++ * callback bumps, so at a fixed 60 Hz everything ran 20% fast -- a 122 s
++ * cutscene track was cut off at 100 s with its picture ahead of the sound,
++ * and scripted lines and events fired early. An explicit RECOMP_VBLANK_HZ
++ * still wins. */
++void xbox_SetVblankRate(unsigned hz)
++{
++    if (!s_vblank_clock.configured)
++        vblank_clock_configure();
++    if (!s_vblank_clock.enabled || s_vblank_clock.legacy || getenv("RECOMP_VBLANK_HZ"))
++        return;
++    if (hz < 24u || hz > 240u || (double)hz == s_vblank_clock.hz)
++        return;
++    s_vblank_clock.hz = (double)hz;
++    s_vblank_clock.period = (LONGLONG)((double)s_vblank_clock.qpf / s_vblank_clock.hz);
++    fprintf(stderr, "  [NV2A] vblank rate: %u Hz, the refresh the title's display mode asked for\n",
++            hz);
++    fflush(stderr);
++}
++
+ /* How long the timer thread may sleep before the next vblank is due, in
+  * microseconds; 0 when it is due now, and "forever" when the clock is off or
+  * running on the legacy pacing, whose loop sleeps a fixed 10 ms. */
+diff --git a/src/kernel/kernel_xbox.c b/src/kernel/kernel_xbox.c
+index cde2057..2562e27 100644
+--- a/src/kernel/kernel_xbox.c
++++ b/src/kernel/kernel_xbox.c
+@@ -183,12 +183,27 @@ static uint32_t console_av_region(void)
+     }
+ }
+ 
++/* A PAL console with 60 Hz enabled in its settings, unless RECOMP_PAL60=0.
++ * A PAL title that offers PAL60 then runs at 60 Hz like the NTSC release
++ * instead of 50; one that does not still gets the vblank rate its mode asks
++ * for (xbox_SetVblankRate). */
++static int pal60_enabled(void)
++{
++    return recomp_config_bool("RECOMP_PAL60", "pal60", 1);
++}
++
+ /* The same answer for AvSendTVEncoderOption (kernel_hal.c), which reports the
+  * video standard and refresh in the same bits: a title reads its standard from
+  * one and D3D validates the mode against the other, so they must agree. */
+ uint32_t xbox_kernel_console_av_standard(void)
+ {
+-    return console_av_region();
++    uint32_t av = console_av_region();
++    /* PAL60 (see XC_VIDEO below): the refresh bits say 60 Hz is available
++     * too, or D3D refuses the 60 Hz mode the title then asks for and
++     * CreateDevice fails. */
++    if (av == XC_AV_STANDARD_PAL_I && pal60_enabled())
++        av |= 0x00400000u;
++    return av;
+ }
+ 
+ NTSTATUS __stdcall xbox_ExQueryNonVolatileSetting(
+@@ -229,6 +244,8 @@ NTSTATUS __stdcall xbox_ExQueryNonVolatileSetting(
+ 
+             if (recomp_config_bool("RECOMP_WIDESCREEN", "widescreen", 0))
+                 flags |= XC_VIDEO_FLAGS_WIDESCREEN;
++            if (console_av_region() == XC_AV_STANDARD_PAL_I && pal60_enabled())
++                flags |= XC_VIDEO_FLAGS_60Hz;
+             *(PULONG)Value = XC_VIDEO_RAW(flags);
+             if (Type) *Type = 4; /* REG_DWORD */
+             if (ResultLength) *ResultLength = sizeof(ULONG);
 diff --git a/src/kernel/nv2a_vsh.c b/src/kernel/nv2a_vsh.c
 index 1f1812f..e42cbff 100644
 --- a/src/kernel/nv2a_vsh.c
@@ -1738,8 +2232,65 @@ index 1f1812f..e42cbff 100644
          break;
      }
      case NV2A_VSH_ILU_LIT: {
+diff --git a/src/kernel/recomp_fps.c b/src/kernel/recomp_fps.c
+index f97403c..95d00ca 100644
+--- a/src/kernel/recomp_fps.c
++++ b/src/kernel/recomp_fps.c
+@@ -233,6 +233,52 @@ static DWORD WINAPI fps_reporter(LPVOID param)
+                 InterlockedExchange(&s_span[0], 0), InterlockedExchange(&s_span[1], 0),
+                 InterlockedExchange(&s_span[2], 0), InterlockedExchange(&s_span[3], 0),
+                 InterlockedExchange(&s_span[4], 0));
++        /* RECOMP_FPS_WATCH=<guest address>: a title's own frame clock (a
++         * counter its vblank callback bumps, say), read each window, so "the
++         * title's time runs slow" is a number rather than an impression. */
++        {
++            static uint32_t watch_va, last;
++            static int init;
++            extern ptrdiff_t g_xbox_mem_offset;
++            if (!init) {
++                const char *w = getenv("RECOMP_FPS_WATCH");
++                init = 1;
++                watch_va = w ? (uint32_t)strtoul(w, NULL, 0) : 0u;
++            }
++            if (watch_va) {
++                uint32_t v = *(volatile uint32_t *)((uintptr_t)watch_va + g_xbox_mem_offset);
++                fprintf(stderr, "[FPS]   guest %08X = %u (+%.1f/s)\n", watch_va, v,
++                        (double)(v - last) / window);
++                last = v;
++            }
++        }
++        /* RECOMP_RAM_DUMP=<dir> with RECOMP_RAM_DUMP_AT=<s>[,<s>...]: guest
++         * RAM written to <dir>/ram_<s>.bin at the first report at or after
++         * each time, for finding a game structure offline by diffing two
++         * moments (where the inventory lives, before a RECOMP_WATCH_WRITE). */
++        {
++            static const char *dir, *at;
++            static int init;
++            extern ptrdiff_t g_xbox_mem_offset;
++            if (!init) {
++                init = 1;
++                dir = getenv("RECOMP_RAM_DUMP");
++                at = getenv("RECOMP_RAM_DUMP_AT");
++            }
++            if (dir && at && *at && elapsed >= atof(at)) {
++                char path[512];
++                FILE *f;
++                snprintf(path, sizeof path, "%s/ram_%.0f.bin", dir, elapsed);
++                f = fopen(path, "wb");
++                if (f) {
++                    fwrite((const void *)(uintptr_t)g_xbox_mem_offset, 1, g_xbox_total_ram, f);
++                    fclose(f);
++                    fprintf(stderr, "[FPS]   guest RAM written to %s\n", path);
++                }
++                at = strchr(at, ',');
++                at = at ? at + 1 : NULL;
++            }
++        }
+         if (wp_on()) {
+             double ms_per_tick = 1000.0 / (double)qpf.QuadPart;
+             EnterCriticalSection(&s_wp_cs);
 diff --git a/src/replay/d3d8_replay.c b/src/replay/d3d8_replay.c
-index 8b1b559..4ee8df1 100644
+index 8b1b559..1ac2565 100644
 --- a/src/replay/d3d8_replay.c
 +++ b/src/replay/d3d8_replay.c
 @@ -25,7 +25,7 @@
@@ -1874,7 +2425,23 @@ index 8b1b559..4ee8df1 100644
      }
      if (FAILED(r->dev->lpVtbl->DrawIndexedPrimitiveUP(
              r->dev, (D3DPRIMITIVETYPE)d->prim_type, d->min_index, d->num_vertices,
-@@ -945,6 +999,11 @@ static void replay_chunk(Replay *r, const D3D8CapChunk *c)
+@@ -764,9 +818,13 @@ static void replay_chunk(Replay *r, const D3D8CapChunk *c)
+         /* A clear after the --draws limit would wipe the draws kept before
+          * it, so it counts as drawing. */
+         if (g_list_draws)
+-            fprintf(stderr, "[clear after %ld draws] flags 0x%X color 0x%08X z %g%s\n",
+-                    g_draw_index, p->flags, p->color, p->z,
++            fprintf(stderr, "[clear after %ld draws] flags 0x%X color 0x%08X z %g, %u rect(s)%s%s\n",
++                    g_draw_index, p->flags, p->color, p->z, p->rect_count,
++                    p->rect_count ? " first " : "",
+                     (g_max_draws >= 0 && g_draw_index >= g_max_draws) ? "  (skipped)" : "");
++        if (g_list_draws && p->rect_count)
++            fprintf(stderr, "[clear]   %d,%d-%d,%d\n", rects[0].x1, rects[0].y1,
++                    rects[0].x2, rects[0].y2);
+         if (g_max_draws >= 0 && g_draw_index >= g_max_draws)
+             break;
+         r->dev->lpVtbl->Clear(r->dev, p->rect_count, p->rect_count ? out : NULL,
+@@ -945,6 +1003,11 @@ static void replay_chunk(Replay *r, const D3D8CapChunk *c)
                      p->first_reg + 1, p->count > 1 ? data[4] : 0.f,
                      p->count > 1 ? data[5] : 0.f, p->count > 1 ? data[6] : 0.f,
                      p->count > 1 ? data[7] : 0.f);
@@ -1886,7 +2453,7 @@ index 8b1b559..4ee8df1 100644
          }
          d3d8_vsh_set_constant((int)p->first_reg, data, (int)p->count);
          break;
-@@ -969,6 +1028,9 @@ static void replay_chunk(Replay *r, const D3D8CapChunk *c)
+@@ -969,6 +1032,9 @@ static void replay_chunk(Replay *r, const D3D8CapChunk *c)
              r->malformed++;
              break;
          }
@@ -1896,7 +2463,7 @@ index 8b1b559..4ee8df1 100644
          d3d8_vsh_set_vertex_data((int)p->reg, p->value);
          break;
      }
-@@ -1077,7 +1139,11 @@ int main(int argc, char **argv)
+@@ -1077,7 +1143,11 @@ int main(int argc, char **argv)
          else if (!strcmp(argv[i], "--draws") && i + 1 < argc)
              g_max_draws = atol(argv[++i]);
          else if (!strcmp(argv[i], "--skip-draw") && i + 1 < argc)
@@ -1909,7 +2476,7 @@ index 8b1b559..4ee8df1 100644
          else if (!strcmp(argv[i], "--list-draws"))
              g_list_draws = 1;
          else if (argv[i][0] == '-') {
-@@ -1124,6 +1190,7 @@ int main(int argc, char **argv)
+@@ -1124,6 +1194,7 @@ int main(int argc, char **argv)
      d3d = xbox_Direct3DCreate8(0);
      hr = d3d ? d3d->lpVtbl->CreateDevice(d3d, 0, 1 /* HAL */, hwnd, 0, &pp, &r.dev)
               : E_FAIL;

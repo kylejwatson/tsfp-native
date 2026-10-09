@@ -18,10 +18,10 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 
 ## Build / lift / run
 
-- Build: `cmd.exe //c build_vs.bat` (VS 2026 "18" + Ninja; writes `build/futureperfect_recomp.exe`). ~10 min full, seconds incremental. Builds are long: run in background and poll `tasklist` for ninja/cl.
+- Build: `cmd.exe //c "C:\Users\mail\Documents\mygame\build_vs.bat"` (the bare name stopped resolving from Git Bash) (VS 2026 "18" + Ninja; writes `build/futureperfect_recomp.exe`). ~10 min full, seconds incremental. Builds are long: run in background and poll `tasklist` for ninja/cl.
 - Re-lift: `./relift.sh` (from disasm; needed after seed changes). `FROM=lift ./relift.sh` after adding/removing an `HLE_EXPORT` in `xboxrecomp/src/hle` or a function in `recomp_manual.c`.
 - The exe finds the game at `..\game_files` relative to itself (or `RECOMP_GAME_DIR`).
-- Scripted test run with frame dumps + contact sheet: `./run_seq.sh <outdir> "<RECOMP_INPUT_SEQ>" <seconds> [dump_every]` → `<outdir>/montage.png`, log `<outdir>.log`. `MINDRAWS=n` and `EXTRA="ENV=1 ..."` are honoured. Always muted.
+- Scripted test run with frame dumps + contact sheet: `./run_seq.sh <name> "<RECOMP_INPUT_SEQ>" <seconds> [dump_every]` → `runs/<name>/montage.png`, log `runs/<name>.log` (`runs/` is ignored; put captures in `caps*/`, replays in `rep*/`, also ignored). `MINDRAWS=n` and `EXTRA="ENV=1 ..."` are honoured. Always muted.
 - Input sequences (needs an existing profile in `game_files/UDATA`, i.e. "Player 1" at index 1):
   - story level 1 (gameplay in ~40 s): `14000:a,17000:down+a,20000:a,23000:a,26000:a,29000:a,36000:start` (the `start` skips the cutscene; a second `start` pauses)
   - arcade game-type menu: `14000:a,17000:down+a,21000:down,22500:a,26000:a`
@@ -31,6 +31,7 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 
 - Frame capture + offline replay: `RECOMP_D3D8_CAPTURE=caps/c.d3dcap RECOMP_D3D8_CAPTURE_SWAP=3000 RECOMP_D3D8_CAPTURE_EVERY=400 RECOMP_D3D8_CAPTURE_MINDRAWS=50`, then `build/xboxrecomp/src/replay/d3d8_replay.exe caps/c_N.d3dcap --out rep/x_` (`--list-draws`, `--no-combiners`, `--skip-draw n`). With `RECOMP_D3D8_PS_SHOW=t0|v0|r0|fog|foga|fogon` to view one combiner register, `RECOMP_D3D8_PS_DUMP=1` for HLSL (+ raw final-combiner words). `xboxrecomp/scripts/bmp_to_png.py` to view BMPs.
 - `RECOMP_HLE_D3D8_DECL_DUMP=1` (vertex declarations, stride-skip details), `RECOMP_HLE_D3D8_PUSH_DUMP=1` (methods in the push buffer), `RECOMP_AUDIO_DUMP=<dir>` (raw PCM per host voice), `RECOMP_DSOUND_STREAM_RATE=<Hz>` (force stream rate).
+- `RECOMP_FPS_WATCH=<guest addr>` prints a guest dword and its rate in every `[FPS]` report (FP's game clock: `0x7497B0`). `RECOMP_RAM_DUMP=<dir> RECOMP_RAM_DUMP_AT=<s>,<s>` writes guest RAM at those times for offline diffing. `RECOMP_HLE_D3D8_TRACE_SWAPS=a-b` shows Clear flags and render-target switches per frame; the replay's `--list-draws` prints clears with their rects.
 - The `[HLE-D3D8] shadow: ... skipped ...` stats line is the first thing to read for rendering problems.
 - Unresolved `[ICALL]` target → `py -3 -m tools.seed_from_log <log> ../game_files/default.xbe --functions ../.pipeline/disasm/functions.json --seeds ../config/seeds.json` (from `xboxrecomp/`), keep only new entries, `./relift.sh`.
 
@@ -54,15 +55,17 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 
 15. Characters in pieces, grey first-person shotgun, missing character-select models: FP loads its skinning programs into the NV2A program slots by writing the push buffer itself (`0x1E9C`/`0x0B00`/`0x1EA0`), so the host drew palette-skinned vertices (v0 = bone offset -24/-28/-32) with the last XDK-selected rigid program. The walker mirrors program memory and `shadow_sync_program` (`hle_d3d8.c`) binds the push buffer's program before each draw (`RECOMP_HLE_D3D8_PUSH_PROGRAM=0` to disable).
 
+16. Cutscenes/dialogue out of sync, game ~20% fast: this is the **PAL** disc (French/German/Italian/Spanish paks; certificate region rest-of-world), so the kernel reports a PAL-I console and FP asked `CreateDevice` for 50 Hz, but the vblank clock was fixed at 60 Hz. FP's game clock is a counter its vertical-blank callback bumps (`sub_00022020` → `0x563918`; per-frame step capped at 3 in `sub_001538C0`, accumulated at `0x7497B0`). The level-1 intro track (musicts.pak entry 0) is 122 s and the picture was over at 100 s. Now: the vblank follows the refresh `CreateDevice` asks for (`xbox_SetVblankRate`), and a PAL console advertises PAL60 (`RECOMP_PAL60=1` default; EEPROM `XC_VIDEO` 60 Hz flag + the AV pack's 60 Hz refresh bit), so FP runs 60 Hz at the right speed. Intro now lasts 120 s.
+17. Black screen behind control hints (cat racing, level 1's "To change controls…") and black main-menu backgrounds: FP clears **alpha only** (Xbox `D3DCLEAR` 0x80; target bits are per channel 0x10 R/0x20 G/0x40 B/0x80 A) and the host cleared all four. The channel bits now travel as host Clear flags (`D3D8_CLEAR_CHANNELS`) and a partial clear is a masked draw (`src/d3d/d3d8_clearmask.c`); clear rectangles are honoured the same way. Probably also the "screen goes dark when creatures shimmer" report (not reached in a scripted run).
+
 Replay tool additions: `--list-draws` prints fog states, raw vertex dwords and recorded vertex data; `REPLAY_ALL_CONSTANTS=1`, `REPLAY_TEX_DUMP=<id>` (writes `tex_<id>.bin`), `REPLAY_NO_CULL=1`, `REPLAY_NO_Z=1`; `RECOMP_D3D8_PS_SHOW=fograw`. `RECOMP_HLE_D3D8_ARRAY_CHECK=1` compares declarations with NV2A arrays (they agreed in level 1). `RECOMP_HLE_D3D8_ARRAY_TRACE=<stride>|1` (+ `_AFTER=<ms>`) prints declaration vs hardware arrays per draw. Replay: `--list-draws` shows each draw's program hash (`prog`, matches `RECOMP_D3D8_VS_DUMP=1` output), `REPLAY_SHOW_CONSTANTS=<first>[,<n>]`, `--skip-draw a-b`. Push dump reports hardware draw count (it matched intercepted draws).
 
 ## Open issues (next steps)
 
-- Cutscene/in-game audio "mis-timed" (user, before fixes 12-15). Measured: the cutscene stream starts at the game's un-pause and completes 2048 ms packets 2.03-2.06 s apart; swaps steady at 60/s (30 fps logic, swaps in pairs); runtime shader compiles in the cutscene ~50 ms. Dialogue/SFX are ADPCM buffers, silent until fix 12, so re-check by ear first. `RECOMP_DSOUND_TRACE=1` lines the stream up against time.
-- Black screen after some checkpoints (user). Not reproduced; a candidate is a full-screen pass coloured from an unfed register (black before fix 14).
-- Scrolling floor/wallpaper in Challenge "Brain Drain" (user). Not visible in a 1.5 s still-camera capture after fix 15; ask for where/when.
+- Weapons given too early (user): level 1 starts with "Got the Scifi Handgun (x2)" while Cortez is still hanging upside down (should come from the marine after landing); the sniper also arrives early later. Independent of fix 16 (still happens at 60 Hz with the right game speed), no `[ICALL]`, kernel allocations are zeroed. Text is in compressed paks, so the give-weapon code was not found from strings; next: find the inventory with `RECOMP_RAM_DUMP` diffs (ammo 16/168 is not stored as a plain int/short/float) and `RECOMP_WATCH_WRITE` it, then read the level script interpreter's condition.
+- Re-check by ear after fix 16: cutscene lip-sync and the "I think we found it…" dialogue.
+- Shimmering (cloaked) creatures darken the screen (user): expected fixed by 17, unverified.
 - Stray triangles at a marine's shoulders in level 1 (seen once, before fix 15); bright rectangle in the first fade-in frame of level 1 (fix 14 side effect).
-- Main-menu animated background goes black after the profile screen (not re-checked).
 - XMV movies are skipped (toolkit built without `third_party/ffmpeg`).
 - PS5 controller: XInput only; needs Steam Input/DS4Windows, or a HID backend in `src/input`.
 

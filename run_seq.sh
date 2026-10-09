@@ -1,10 +1,11 @@
 #!/bin/bash
 # usage: run_seq.sh <outdir> <seq> <secs> [dump_every]
+# Output goes to runs/<outdir>/ (frames, montage.png) and runs/<outdir>.log.
 cd /c/Users/mail/Documents/mygame/build
-mkdir -p ../$1; rm -f ../$1/*.bmp ../$1/*.png 2>/dev/null
-env $EXTRA RECOMP_MUTE=1 RECOMP_FPS=5 RECOMP_INPUT_SEQ="$2" RECOMP_HLE_D3D8_DUMP=../$1/h RECOMP_HLE_D3D8_DUMP_EVERY=${4:-200} RECOMP_HLE_D3D8_DUMP_MINDRAWS=${MINDRAWS:-1} timeout $3 ./futureperfect_recomp.exe > ../$1.log 2>&1
-cd ..
-py -3 xboxrecomp/scripts/bmp_to_png.py -o $1 $1/h*.bmp >/dev/null
+mkdir -p ../runs/$1; rm -f ../runs/$1/*.bmp ../runs/$1/*.png 2>/dev/null
+env $EXTRA RECOMP_MUTE=1 RECOMP_FPS=5 RECOMP_INPUT_SEQ="$2" RECOMP_HLE_D3D8_DUMP=../runs/$1/h RECOMP_HLE_D3D8_DUMP_EVERY=${4:-200} RECOMP_HLE_D3D8_DUMP_MINDRAWS=${MINDRAWS:-1} timeout $3 ./futureperfect_recomp.exe > ../runs/$1.log 2>&1
+cd ../runs
+py -3 ../xboxrecomp/scripts/bmp_to_png.py -o $1 $1/h*.bmp >/dev/null
 py -3 - <<PY
 from PIL import Image
 import glob

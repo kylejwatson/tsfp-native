@@ -64,6 +64,15 @@ d[0-9]*.log
 caps/
 adump*/
 *.wav
-rep/
-caps2/
+
+# Scratch output from test runs and debugging. Game frames, captures and RAM
+# dumps hold the title's assets: never commit them.
+runs/
+caps*/
+rep*/
+ramd/
+adump*/
+*.d3dcap
+*.bmp
+*.raw
 level_seq.txt
