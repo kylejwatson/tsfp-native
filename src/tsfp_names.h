@@ -73,6 +73,8 @@
 #define TSFP_FN_BAG_TOUCH                        0x000BFFE0u
 #define TSFP_FN_BAG_CAPTURE                      0x000C09B0u
 #define TSFP_FN_BASE_ZONE_TOUCH                  0x000C11A0u
+#define TSFP_FN_PICKUP_TOUCH                     0x000C1360u
+#define TSFP_FN_PICKUP_TOUCH_TEST                0x000C15B0u
 #define TSFP_FN_CHARACTER_CONTACT_FIRE           0x000C3890u
 #define TSFP_FN_CAMERA_TABLE_BUILD               0x000C5C40u
 #define TSFP_FN_CAMERA_SEQUENCE_START            0x000C6100u
@@ -89,6 +91,7 @@
 #define TSFP_FN_CHARACTER_IGNITE                 0x001252C0u
 #define TSFP_FN_CONTACT_FIRE                     0x00126280u
 #define TSFP_FN_GAME_CLOCK_STEP                  0x001538C0u
+#define TSFP_FN_ANGLE_LIMIT                      0x00153F90u
 #define TSFP_FN_PATH_NEXT_PAD                    0x001596F0u
 #define TSFP_FN_BOTS_SET_BEHAVIOUR               0x0015BFF0u
 #define TSFP_FN_CHARACTER_APPLY_BEHAVIOUR        0x0015C700u
@@ -301,10 +304,12 @@
 #define TSFP_FN_SCRIPT_CB_2D_GHOSTS              0x0024A100u
 #define TSFP_FN_GHOST_THINK                      0x0024ABA0u
 #define TSFP_FN_SCRIPT_CB_10                     0x0024D220u
+#define TSFP_FN_PLAYER_LOOK_MOUNTED              0x00258A20u
 #define TSFP_FN_PLAYER_MOVE_WALK                 0x00258F50u
 #define TSFP_FN_PLAYER_TO_PAD                    0x0025C440u
 #define TSFP_FN_PLAYER_MOVE_ANIMATION            0x0025C650u
 #define TSFP_FN_PLAYER_READ_LOOK_MOVE            0x0025CE80u
+#define TSFP_FN_PLAYER_LOOK_SEATED               0x0025D270u
 #define TSFP_FN_PLAYER_APPLY_LOOK                0x0025D520u
 #define TSFP_FN_SCRIPT_CB_08                     0x0025F0C0u
 #define TSFP_FN_SPAWNER_ACT_24                   0x0025F250u

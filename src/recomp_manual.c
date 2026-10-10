@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>   /* getenv, exit: the spin verdict below */
 #include <string.h>   /* strcmp: RECOMP_ICALL_FATAL */
+#include <math.h>     /* floorf, fabsf: mounted-gun angle limits */
 
 /* One diagnostic report, one piece.
  *
@@ -157,6 +158,95 @@ extern void sub_0025D520_gen(void);
 #define GUEST_F32(va) (*(volatile float *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
 #define GUEST_S8(va)  (*(volatile int8_t *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
 
+/* Mounted guns and seats, the two move states the walking path above skips.
+ *
+ * 0x80 (player_look_mounted): the stick turns the *object*, not the player:
+ * its data (object+0x7C) holds pitch +0x1C, which the stick y is subtracted
+ * from, and yaw +0x24, which the stick x is added to, each kept in its arc
+ * by angle_limit; +0x5C scales both when +0x08 has 0x1000000. Objects of
+ * type 1 and 9 are not turned at all. 0x40 (player_look_seated): the stick
+ * turns Player.yaw/pitch, which are then held inside the object's arcs
+ * measured from its heading (object+0x70). Both use the same degrees per
+ * count as on foot; the limits are reapplied after the mouse is added, the
+ * way the game applies them after the stick. */
+#define TSFP_CHARDATA_MOUNT      0xC14u  /* character data -> object used */
+#define TSFP_OBJECT_DATA         0x07Cu
+#define TSFP_OBJECT_HEADING      0x070u
+#define TSFP_MOUNT_FLAGS         0x008u
+#define TSFP_MOUNT_TYPE          0x010u
+#define TSFP_MOUNT_PITCH         0x01Cu
+#define TSFP_MOUNT_YAW           0x024u
+#define TSFP_MOUNT_PITCH_LO      0x034u  /* lo == hi: the axis is fixed */
+#define TSFP_MOUNT_PITCH_HI      0x038u
+#define TSFP_MOUNT_YAW_LO        0x03Cu
+#define TSFP_MOUNT_YAW_HI        0x040u
+#define TSFP_MOUNT_SENSITIVITY   0x05Cu
+
+static float tsfp_wrap180(float a)
+{
+    return a - floorf((a + 180.0f) / 360.0f) * 360.0f;
+}
+
+/* angle_limit (0x00153F90), for the lo != hi case its callers use it in. */
+static float tsfp_angle_limit(float a, float lo, float hi)
+{
+    if (fabsf(hi - lo) >= 360.0f)
+        return tsfp_wrap180(a);
+    if (a < lo)
+        return lo;
+    if (a > hi)
+        return hi;
+    return a;
+}
+
+static void tsfp_mouse_look_mounted(uint32_t state, uint32_t mount,
+                                    float dyaw, float dpitch)
+{
+    uint32_t d = GUEST_U32(mount + TSFP_OBJECT_DATA);
+    float lo, hi;
+
+    if (!d)
+        return;
+    if (state == 0x80) {
+        uint32_t type = GUEST_U32(d + TSFP_MOUNT_TYPE);
+        float yaw, pitch;
+
+        if (type == 1 || type == 9)
+            return;
+        if (GUEST_U32(d + TSFP_MOUNT_FLAGS) & 0x1000000u) {
+            dyaw *= GUEST_F32(d + TSFP_MOUNT_SENSITIVITY);
+            dpitch *= GUEST_F32(d + TSFP_MOUNT_SENSITIVITY);
+        }
+        /* The object's pitch runs the other way to the player's. */
+        pitch = GUEST_F32(d + TSFP_MOUNT_PITCH) + dpitch;
+        yaw = GUEST_F32(d + TSFP_MOUNT_YAW) + dyaw;
+        lo = GUEST_F32(d + TSFP_MOUNT_PITCH_LO);
+        hi = GUEST_F32(d + TSFP_MOUNT_PITCH_HI);
+        pitch = lo == hi ? lo : tsfp_angle_limit(pitch, lo, hi);
+        lo = GUEST_F32(d + TSFP_MOUNT_YAW_LO);
+        hi = GUEST_F32(d + TSFP_MOUNT_YAW_HI);
+        yaw = lo == hi ? lo : tsfp_angle_limit(yaw, lo, hi);
+        GUEST_F32(d + TSFP_MOUNT_PITCH) = pitch;
+        GUEST_F32(d + TSFP_MOUNT_YAW) = yaw;
+    } else {
+        uint32_t p = GUEST_U32(TSFP_G_PLAYER);
+        float heading = GUEST_F32(mount + TSFP_OBJECT_HEADING);
+        float yaw = tsfp_wrap180(GUEST_F32(p + TSFP_PLAYER_YAW) + dyaw - heading);
+        float pitch = tsfp_wrap180(GUEST_F32(p + TSFP_PLAYER_PITCH) - dpitch);
+
+        lo = GUEST_F32(d + TSFP_MOUNT_PITCH_LO);
+        hi = GUEST_F32(d + TSFP_MOUNT_PITCH_HI);
+        if (lo != hi)
+            pitch = tsfp_angle_limit(pitch, lo, hi);
+        lo = GUEST_F32(d + TSFP_MOUNT_YAW_LO);
+        hi = GUEST_F32(d + TSFP_MOUNT_YAW_HI);
+        if (lo != hi)
+            yaw = tsfp_angle_limit(yaw, lo, hi);
+        GUEST_F32(p + TSFP_PLAYER_YAW) = tsfp_wrap180(yaw + heading);
+        GUEST_F32(p + TSFP_PLAYER_PITCH) = pitch;
+    }
+}
+
 static void tsfp_mouse_look(void)
 {
     uint32_t p, cam, state, mode;
@@ -172,7 +262,7 @@ static void tsfp_mouse_look(void)
     if (!p || GUEST_U32(p + TSFP_PLAYER_PAD_INDEX) != 0)
         return;                                 /* the mouse is player 1's */
     state = GUEST_U32(p + TSFP_PLAYER_MOVE_STATE);
-    if (state == 0x20 || state == 0x40 || state == 0x80 || state == 0x100)
+    if (state == 0x20 || state == 0x100)
         return;                                 /* states that do not look */
     cam = GUEST_U32(TSFP_G_CAMERA);
     mode = cam ? GUEST_U32(cam + TSFP_CAMERA_MODE) : 0;
@@ -188,7 +278,18 @@ static void tsfp_mouse_look(void)
             scale = fov / def;
     }
 
-    yaw = GUEST_F32(p + TSFP_PLAYER_YAW) - (float)recomp_mouse_counts_to_degrees(dx) * scale;
+    if (state == 0x40 || state == 0x80) {
+        uint32_t ch = GUEST_U32(p + TSFP_PLAYER_CHARACTER);
+        uint32_t cd = ch ? GUEST_U32(ch + TSFP_OBJECT_DATA) : 0;
+        uint32_t mount = cd ? GUEST_U32(cd + TSFP_CHARDATA_MOUNT) : 0;
+        if (mount)
+            tsfp_mouse_look_mounted(state, mount,
+                -(float)recomp_mouse_counts_to_degrees(dx) * scale,
+                (float)recomp_mouse_counts_to_degrees(dy) * scale);
+        return;
+    }
+
+    yaw =GUEST_F32(p + TSFP_PLAYER_YAW) - (float)recomp_mouse_counts_to_degrees(dx) * scale;
     while (yaw < 0.0f)
         yaw += 360.0f;
     while (yaw >= 360.0f)
