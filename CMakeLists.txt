@@ -94,6 +94,13 @@ add_executable(${PROJECT_NAME} WIN32
 # Link against the xboxrecomp umbrella target (all 6 runtime libraries)
 target_link_libraries(${PROJECT_NAME} PRIVATE xboxrecomp)
 
+# The keyboard bindings, beside the exe where the runtime looks for them.
+add_custom_target(input_bindings ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/config/input_bindings.json
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>/input_bindings.json
+)
+
 # Include paths for generated recomp headers
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

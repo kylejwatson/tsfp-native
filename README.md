@@ -1,23 +1,74 @@
-# TimeSplitters: Future Perfect - static recompilation (Windows)
+# TimeSplitters: Future Perfect — static recompilation (Windows)
 
-Toolkit: `xboxrecomp/` is a git submodule of the phobos665 fork of xboxrecomp (D3D8 HLE, XDK symbol
-database, TS:FP seeds), pinned to be78f4c. Clone with `git submodule update --init xboxrecomp third_party/XbSymbolDatabase`
-(run the second path from inside `xboxrecomp`; xemu/nxdk/Cxbx-Reloaded are not needed). The XbSymbolDatabase CLI must be built once for `tools.xdk_symbols`.
-Game files (your own disc) go in `game_files/`.
+A native Windows build of TimeSplitters: Future Perfect (Xbox, PAL disc, title `0x45410066`),
+lifted to C with the [xboxrecomp](https://github.com/kylejwatson/xboxrecomp/tree/tsfp) toolkit.
+You need your own copy of the game.
 
-Re-lift (only when seeds/symbols/toolkit change), from `xboxrecomp/`:
+## Repository layout
 
-    py -3 -m tools.xdk_symbols ../game_files/default.xbe
-    py -3 scripts/recompile.py ../game_files/default.xbe --work-dir ../.pipeline --project .. --split 400
+| Path | What |
+|---|---|
+| `xboxrecomp/` | submodule: [kylejwatson/xboxrecomp](https://github.com/kylejwatson/xboxrecomp), branch `tsfp` (a fork of phobos665/xboxrecomp with the D3D8 HLE plus the Future Perfect fixes) |
+| `src/main.c` | title entry point |
+| `src/recomp_manual.c` | hand-written overrides of lifted functions, each with its reason |
+| `config/seeds.json` | extra function seeds for the lifter |
+| `config/input_bindings.json` | keyboard bindings, copied next to the exe at build time |
+| `relift.sh` | regenerate the C from the XBE |
+| `build_vs.bat` | build with Visual Studio + Ninja |
+| `run_seq.sh` | scripted test run with frame dumps |
+| `game_files/` | your extracted disc (not committed) |
 
-Build (VS 2026 + Ninja): `build_vs.bat`  ->  `build\futureperfect_recomp.exe`
-Run from anywhere; it finds `..\game_files` relative to the exe, or set RECOMP_GAME_DIR.
+## Setup
 
-## Toolkit patches
+```bash
+git clone <this repository> mygame && cd mygame
+git submodule update --init xboxrecomp
+git -C xboxrecomp submodule update --init third_party/XbSymbolDatabase
+```
 
-`patches/*.patch` are changes to the xboxrecomp submodule that are not upstream yet (run
-`./apply_patches.sh` after a fresh submodule checkout; `FROM=lift ./relift.sh` after changing HLE exports).
-`xboxrecomp-fp-changes.patch` makes the D3D8 shadow renderer read the NV2A vertex arrays out of the
-push buffer when the title sets them itself (Future Perfect does), which is what makes its 3D geometry draw.
+xemu, nxdk and Cxbx-Reloaded are not needed. Build the XbSymbolDatabase CLI once (see
+`xboxrecomp/README.md`), then extract the disc into `game_files/` and generate its symbol file:
 
-It also stops the game reading the keyboard and pad while another window has focus (set `RECOMP_INPUT_BACKGROUND=1` to restore the old behaviour).
+```bash
+cd xboxrecomp && py -3 -m tools.xdk_symbols ../game_files/default.xbe
+```
+
+## Lift and build
+
+```bash
+./relift.sh          # full lift from disassembly (after seed changes)
+FROM=lift ./relift.sh  # after adding/removing an HLE export or a recomp_manual.c function
+build_vs.bat         # VS 2026 + Ninja -> build/futureperfect_recomp.exe
+```
+
+The exe finds the game at `..\game_files` relative to itself, or in `RECOMP_GAME_DIR`.
+
+## Controls
+
+Keyboard, from `config/input_bindings.json` (copied next to the exe by the build); an XInput pad
+also works.
+
+| Key | Xbox |
+|---|---|
+| WASD | left stick |
+| IJKL | right stick |
+| Space / Z | A |
+| X | B |
+| C | X |
+| V | Y |
+| E / O | left trigger |
+| R / U | right trigger |
+| Q | White |
+| F | Black |
+| LShift / P | left / right stick click |
+| Arrows | D-pad |
+| Enter | Start |
+| Backspace | Back |
+
+Input is ignored while the window does not have focus. A config in
+`%APPDATA%\xboxrecomp\input_bindings.json` takes precedence over the one beside the exe.
+
+## Toolkit changes
+
+All changes to the toolkit live on the `tsfp` branch of the fork; commit there, push, and bump
+the submodule pointer here. See `CLAUDE.md` for the history of fixes and the debugging tools.

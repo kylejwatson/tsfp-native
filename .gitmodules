@@ -1,3 +1,4 @@
 [submodule "xboxrecomp"]
 	path = xboxrecomp
-	url = https://github.com/phobos665/xboxrecomp.git
+	url = https://github.com/kylejwatson/xboxrecomp.git
+	branch = tsfp

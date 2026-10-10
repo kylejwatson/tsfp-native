@@ -8,8 +8,7 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 
 | Path | What |
 |---|---|
-| `xboxrecomp/` | submodule: **phobos665/xboxrecomp** (a fork with D3D8 HLE, FP seeds), pinned to `be78f4c`. Not sp00nznet upstream — that one has no D3D8 HLE and cannot render this game. |
-| `patches/xboxrecomp-fp-changes.patch` | **our changes to the toolkit** (we can't push to the fork). `./apply_patches.sh` after a fresh submodule checkout. Regenerate after editing the submodule: `git -C xboxrecomp add -N <new files>; git -C xboxrecomp diff --binary HEAD > patches/xboxrecomp-fp-changes.patch` |
+| `xboxrecomp/` | submodule: **kylejwatson/xboxrecomp**, branch `tsfp` (the user's fork of phobos665/xboxrecomp, which has the D3D8 HLE and FP seeds; sp00nznet upstream has no D3D8 HLE and cannot render this game). All our toolkit changes are commits on `tsfp`: commit there, push to `kyles-origin`, then commit the bumped submodule pointer here. `origin` in the submodule is still phobos665. |
 | `src/main.c`, `src/recomp_manual.c` | title project (from `xboxrecomp/titles/futureperfect`). Overrides live only in `recomp_manual.c`, each with its reason. |
 | `config/seeds.json` | our extra function seeds (toolkit's `config/seeds/45410066.json` is also passed) |
 | `game_files/` | the user's extracted disc (ignored). `game_files/default_xdk_symbols.json` comes from `py -3 -m tools.xdk_symbols` (needs the XbSymbolDatabase CLI built once, see README). |
@@ -76,4 +75,5 @@ Inputs for the challenge: `14000:a,17000:down+a,21000:down,22000:down,23500:a,27
 - Many toolkit sources are CRLF; edit with the Edit tool or preserve line endings. Python heredocs writing C with `\n` inside string literals have turned into real newlines here — check with `cat -A` after scripted edits.
 - `rm -rf` of directories is blocked by the harness; leave scratch dirs (they're gitignored).
 - Scripted runs create/modify saves in `game_files/UDATA/45410066` (a throwaway "bbbb…" profile exists).
+- A Claude shell sees a `%APPDATA%\xboxrecomp\input_bindings.json` (stale) that the user's real profile doesn't have, and it wins over the one beside the exe: test runs that depend on the bindings need `RECOMP_INPUT_CONFIG=<repo>/build/input_bindings.json`.
 - Don't commit game data, captures (`*.d3dcap`), dumps or generated C.
