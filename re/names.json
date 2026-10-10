@@ -120,6 +120,13 @@
    "source": "Ghidra, tsfp-rewrite project"
   },
   {
+   "addr": "0x00059D20",
+   "name": "character_anim_is",
+   "sig": "int character_anim_is(void *character, int anim)",
+   "notes": "1 when the character's current animation (character+4 -> +0xD4, or +0x12C) is anim.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
+  },
+  {
    "addr": "0x00062610",
    "name": "level_pak_path",
    "source": "Ghidra, tsfp-rewrite project"
@@ -394,6 +401,27 @@
    "source": "Ghidra, tsfp-rewrite project"
   },
   {
+   "addr": "0x000C3B10",
+   "name": "floor_height",
+   "sig": "float floor_height(int floor, ...)",
+   "notes": "Height of floor polygon `floor` under a point; -FLT_MAX (DAT_00478618) for none.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
+  },
+  {
+   "addr": "0x000C3C50",
+   "name": "floor_find",
+   "sig": "int floor_find(float *pos, float up, float radius)",
+   "notes": "The floor polygon under a point (0 for none).",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
+  },
+  {
+   "addr": "0x000C5A50",
+   "name": "collision_sweep",
+   "sig": "uint collision_sweep(world, float *from, float *to, float radius, float height, ...)",
+   "notes": "Swept collision test; the result's bits 0xE mean blocked.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
+  },
+  {
    "addr": "0x000C5C40",
    "name": "camera_table_build",
    "source": "Ghidra, tsfp-rewrite project"
@@ -448,6 +476,13 @@
    "addr": "0x000D6C90",
    "name": "character_is_monkey",
    "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000DA280",
+   "name": "character_to_nav_point",
+   "sig": "void character_to_nav_point(void *character, int point, int arg)",
+   "notes": "Places a character at a nav point (sub_000D6F60 writes its position).",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
   },
   {
    "addr": "0x000EAAF0",
@@ -736,6 +771,34 @@
    "addr": "0x00164010",
    "name": "spawner_activate",
    "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00176C30",
+   "name": "vehicle_exit_clear",
+   "sig": "int vehicle_exit_clear(uint *seat) /* esi = vehicle, eax -> position */",
+   "notes": "0 when the way from the seat to the position is clear (collision_sweep, then a floor under it), else -1.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
+  },
+  {
+   "addr": "0x0017C740",
+   "name": "vehicle_dismount",
+   "sig": "void vehicle_dismount(void *vehicle, void *character, int exit_anim, int arg)",
+   "notes": "Takes a character out of its seat: with no exit animation (or vehicle_exit_clear failing) it is put at the nearest nav point (character_to_nav_point), else the exit animation plays.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
+  },
+  {
+   "addr": "0x0017DA00",
+   "name": "vehicle_rider_update",
+   "sig": "void vehicle_rider_update(void *vehicle, RiderCmd *cmd)",
+   "notes": "Per-seat update for cmd's character (cmd+0x1C handle, +0x18 flags): bit 0x40 (dismount requested) calls vehicle_dismount.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
+  },
+  {
+   "addr": "0x0017E010",
+   "name": "vehicle_rider_action",
+   "sig": "int vehicle_rider_action(void *vehicle, void *character, int action, int arg)",
+   "notes": "An AI rider's vehicle action; action 0xD sets the dismount bit (0x40) in the command it hands to vehicle_rider_update.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
   },
   {
    "addr": "0x0018FF70",
@@ -1764,6 +1827,13 @@
    "addr": "0x0027FE30",
    "name": "ai_think",
    "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002A0500",
+   "name": "ai_vehicle_update",
+   "sig": "void ai_vehicle_update(...)",
+   "notes": "AI per-tick vehicle behaviour; at 0x002A0C48 `test al,0x10; jne` skips action 0xD (dismount). The toolkit lifted that jne inverted (ZF-join fallback), so Captain Ash was ordered out of the gunner seat every third frame in the second level.",
+   "source": "secondlevel gunner-seat investigation (RAM bursts, write watch, Ghidra)"
   },
   {
    "addr": "0x002B4C70",

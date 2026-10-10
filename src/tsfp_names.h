@@ -22,6 +22,7 @@
 #define TSFP_FN_PADS_UPDATE                      0x000438B0u
 #define TSFP_FN_DEVFLAGS_COPY                    0x00056EC0u
 #define TSFP_FN_CHARACTER_SET_SCALE              0x00058C70u
+#define TSFP_FN_CHARACTER_ANIM_IS                0x00059D20u
 #define TSFP_FN_LEVEL_PAK_PATH                   0x00062610u
 #define TSFP_FN_SCORE_KILLS                      0x000640C0u
 #define TSFP_FN_TEAM_SCORE                       0x00064160u
@@ -76,6 +77,9 @@
 #define TSFP_FN_PICKUP_TOUCH                     0x000C1360u
 #define TSFP_FN_PICKUP_TOUCH_TEST                0x000C15B0u
 #define TSFP_FN_CHARACTER_CONTACT_FIRE           0x000C3890u
+#define TSFP_FN_FLOOR_HEIGHT                     0x000C3B10u
+#define TSFP_FN_FLOOR_FIND                       0x000C3C50u
+#define TSFP_FN_COLLISION_SWEEP                  0x000C5A50u
 #define TSFP_FN_CAMERA_TABLE_BUILD               0x000C5C40u
 #define TSFP_FN_CAMERA_SEQUENCE_START            0x000C6100u
 #define TSFP_FN_CAMERA_DEFAULT_FOV               0x000CB3B0u
@@ -85,6 +89,7 @@
 #define TSFP_FN_PLAYER_STATE_DISPATCH            0x000D5C70u
 #define TSFP_FN_PLAYER_UPDATE                    0x000D5EB0u
 #define TSFP_FN_CHARACTER_IS_MONKEY              0x000D6C90u
+#define TSFP_FN_CHARACTER_TO_NAV_POINT           0x000DA280u
 #define TSFP_FN_PROJECTILE_CREATE                0x000EAAF0u
 #define TSFP_FN_EMITTER_START                    0x00111AE0u
 #define TSFP_FN_GLADIATOR_MARK                   0x00120F70u
@@ -142,6 +147,10 @@
 #define TSFP_FN_SPAWNER_ACT_27                   0x00163D90u
 #define TSFP_FN_SPAWNER_ACT_2B                   0x00163E10u
 #define TSFP_FN_SPAWNER_ACTIVATE                 0x00164010u
+#define TSFP_FN_VEHICLE_EXIT_CLEAR               0x00176C30u
+#define TSFP_FN_VEHICLE_DISMOUNT                 0x0017C740u
+#define TSFP_FN_VEHICLE_RIDER_UPDATE             0x0017DA00u
+#define TSFP_FN_VEHICLE_RIDER_ACTION             0x0017E010u
 #define TSFP_FN_PAD_POLL_PORT                    0x0018FF70u
 #define TSFP_FN_AMMO_WEAPON_LOOKUP               0x001BFEC0u
 #define TSFP_FN_WEAPON_FIRE                      0x001C0200u
@@ -345,6 +354,7 @@
 #define TSFP_FN_AI_DISPATCH_ARCADE               0x0027DF60u
 #define TSFP_FN_AI_DISPATCH_LOW                  0x0027F8E0u
 #define TSFP_FN_AI_THINK                         0x0027FE30u
+#define TSFP_FN_AI_VEHICLE_UPDATE                0x002A0500u
 #define TSFP_FN_BOT_RESPAWN                      0x002B4C70u
 #define TSFP_FN_ARCADE_SETUP                     0x002B51E0u
 #define TSFP_FN_BOT_MODE_GOAL_Q                  0x002B55D0u
