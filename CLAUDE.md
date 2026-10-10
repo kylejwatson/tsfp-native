@@ -13,7 +13,9 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 | `config/seeds.json` | our extra function seeds (toolkit's `config/seeds/45410066.json` is also passed) |
 | `game_files/` | the user's extracted disc (ignored). `game_files/default_xdk_symbols.json` comes from `py -3 -m tools.xdk_symbols` (needs the XbSymbolDatabase CLI built once, see README). |
 | `src/recomp/gen/`, `.pipeline/`, `build/` | generated (ignored) |
-| `ghidra/` | user's Ghidra project (ignored, unused so far) |
+| `re/names.json` | **every function, global and struct we have identified** (with how it is known). Add to it whenever something is found; `py -3 re/names.py header` regenerates `src/tsfp_names.h` (the `TSFP_*` addresses/offsets the overrides use), `py -3 re/names.py ghidra` applies it to the Ghidra project, `py -3 re/names.py pull` takes names given in the Ghidra GUI back into the file. |
+| `ghidra/` | user's Ghidra project (`tsfp.gpr`, ignored), names applied from `re/names.json`. Driven headless by ghidra-cli (`C:\ghidra-cli\ghidra.exe`): start the bridge once with `ghidra.exe start --project C:/Users/mail/Documents/mygame/ghidra/tsfp.gpr --program default.xbe` (it stays in the foreground: run it in the background; forward slashes, the bridge is matched by the path string), then `ghidra.exe decompile 0xADDR`, `x-ref to 0xADDR`, `function get 0xADDR`. Close the Ghidra GUI first (project lock). |
+| `seqs/*.seq`, `play.bat`, `record.bat`, `recordings/` | routes into the game: `play.bat brain_drain` drives the menus to gameplay; `record.bat <name>` records what you press, `play.bat <name>` replays it (recordings are ignored) |
 
 ## Build / lift / run
 
@@ -24,7 +26,9 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 - Input sequences (needs an existing profile in `game_files/UDATA`, i.e. "Player 1" at index 1):
   - story level 1 (gameplay in ~40 s): `14000:a,17000:down+a,20000:a,23000:a,26000:a,29000:a,36000:start` (the `start` skips the cutscene; a second `start` pauses)
   - arcade game-type menu: `14000:a,17000:down+a,21000:down,22500:a,26000:a`
+- The same routes as files: `RECOMP_INPUT_SEQ=@../seqs/brain_drain.seq` (`story1`, `arcade_select`). Scripts can move the mouse (`mouse_right:1000` = 1000 counts = 55 degrees at sensitivity 2.5). `RECOMP_INPUT_RECORD=<file>` / `RECOMP_INPUT_REPLAY=<file>` record and replay port 1 (pad and mouse).
 - Input is ignored while the window is unfocused (our change); `RECOMP_INPUT_SEQ` is unaffected. Keyboard: Z=A, X=B, arrows, Enter=Start.
+- Scripted runs: pass `RECOMP_MOUSE=0` (run_seq.sh does) or the window captures the desktop cursor when it comes up in front.
 
 ## Debugging tools that paid off
 
@@ -32,6 +36,7 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 - `RECOMP_HLE_D3D8_DECL_DUMP=1` (vertex declarations, stride-skip details), `RECOMP_HLE_D3D8_PUSH_DUMP=1` (methods in the push buffer), `RECOMP_AUDIO_DUMP=<dir>` (raw PCM per host voice), `RECOMP_DSOUND_STREAM_RATE=<Hz>` (force stream rate).
 - `RECOMP_FPS_WATCH=<guest addr>` prints a guest dword and its rate in every `[FPS]` report (FP's game clock: `0x7497B0`). `RECOMP_RAM_DUMP=<dir> RECOMP_RAM_DUMP_AT=<s>,<s>` writes guest RAM at those times for offline diffing. `RECOMP_HLE_D3D8_TRACE_SWAPS=a-b` shows Clear flags and render-target switches per frame; the replay's `--list-draws` prints clears with their rects.
 - The `[HLE-D3D8] shadow: ... skipped ...` stats line is the first thing to read for rendering problems.
+- Finding game state: `RECOMP_RAM_DUMP` writes `ram_<s>.bin` (low 64 MB) **and `contig_<s>.bin` (0x80000000..)** -- the player object is in the contiguous window, so diff both. Read-watching a value (`RECOMP_WATCH_WRITE=<addr> RECOMP_WATCH_READS=1 RECOMP_WATCH_ARM_ON=lv60.pak`) names who reads it; that is how the look code was found from the pad record. Ghidra's xrefs miss calls through tail-jump thunks (`player_control_axis` jumps to `pad_axis`).
 - Unresolved `[ICALL]` target → `py -3 -m tools.seed_from_log <log> ../game_files/default.xbe --functions ../.pipeline/disasm/functions.json --seeds ../config/seeds.json` (from `xboxrecomp/`), keep only new entries, `./relift.sh`.
 
 ## What has been fixed (and why) — details in git log
@@ -56,6 +61,8 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 
 16. Cutscenes/dialogue out of sync, game ~20% fast: this is the **PAL** disc (French/German/Italian/Spanish paks; certificate region rest-of-world), so the kernel reports a PAL-I console and FP asked `CreateDevice` for 50 Hz, but the vblank clock was fixed at 60 Hz. FP's game clock is a counter its vertical-blank callback bumps (`sub_00022020` → `0x563918`; per-frame step capped at 3 in `sub_001538C0`, accumulated at `0x7497B0`). The level-1 intro track (musicts.pak entry 0) is 122 s and the picture was over at 100 s. Now: the vblank follows the refresh `CreateDevice` asks for (`xbox_SetVblankRate`), and a PAL console advertises PAL60 (`RECOMP_PAL60=1` default; EEPROM `XC_VIDEO` 60 Hz flag + the AV pack's 60 Hz refresh bit), so FP runs 60 Hz at the right speed. Intro now lasts 120 s.
 17. Black screen behind control hints (cat racing, level 1's "To change controls…") and black main-menu backgrounds: FP clears **alpha only** (Xbox `D3DCLEAR` 0x80; target bits are per channel 0x10 R/0x20 G/0x40 B/0x80 A) and the host cleared all four. The channel bits now travel as host Clear flags (`D3D8_CLEAR_CHANNELS`) and a partial clear is a masked draw (`src/d3d/d3d8_clearmask.c`); clear rectangles are honoured the same way. Probably also the "screen goes dark when creatures shimmer" report (not reached in a scripted run).
+
+18. Mouse look (real, not a fake stick): `sub_0025D520` (`player_apply_look`, integrates the look stick into `Player.yaw`/`pitch`, degrees) is wrapped in `recomp_manual.c`; after the original body runs, the raw mouse counts since last frame are added at 0.022 x sensitivity degrees per count (default 2.5), scaled by fov/default fov (scope), yaw wrapped [0,360), pitch clamped +-60, only while the player has control. Path from pad to camera: `pad_poll_port` -> `g_pads` -> `pad_axis` -> `player_control_axis` (control scheme) -> `player_read_look_move` -> `player_apply_look`, all in `re/names.json`. Mouse buttons: left = R trigger (fire), right = L trigger, wheel = Y (`config/input_bindings.json`, `"mouse"` object for look/sensitivity/invert). F8 releases the cursor, a click recaptures; `RECOMP_MOUSE=0` disables capture. Toolkit side: `xboxrecomp/src/input/recomp_mouse.c` (raw input + capture from the removed e00a4eb, stick emulation dropped).
 
 Replay tool additions: `--list-draws` prints fog states, raw vertex dwords and recorded vertex data; `REPLAY_ALL_CONSTANTS=1`, `REPLAY_TEX_DUMP=<id>` (writes `tex_<id>.bin`), `REPLAY_NO_CULL=1`, `REPLAY_NO_Z=1`; `RECOMP_D3D8_PS_SHOW=fograw`. `RECOMP_HLE_D3D8_ARRAY_CHECK=1` compares declarations with NV2A arrays (they agreed in level 1). `RECOMP_HLE_D3D8_ARRAY_TRACE=<stride>|1` (+ `_AFTER=<ms>`) prints declaration vs hardware arrays per draw. Replay: `--list-draws` shows each draw's program hash (`prog`, matches `RECOMP_D3D8_VS_DUMP=1` output), `REPLAY_SHOW_CONSTANTS=<first>[,<n>]`, `--skip-draw a-b`. Push dump reports hardware draw count (it matched intercepted draws).
 

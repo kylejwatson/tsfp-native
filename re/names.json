@@ -1,0 +1,2289 @@
+{
+ "about": "Names for TimeSplitters: Future Perfect (PAL default.xbe, title 0x45410066): the one place what we learn about the game is recorded. re/names.py applies it to the Ghidra project and generates src/tsfp_names.h. Addresses are guest VAs; keep entries sorted by address and give each a source.",
+ "actions": {
+  "0x0E": "move x",
+  "0x0F": "move y",
+  "0x10": "look y",
+  "0x11": "look x (negated)",
+  "0x12": "move x (alt states)",
+  "0x13": "move y (alt states)",
+  "0x14": "look y (alt states)",
+  "0x15": "look x (alt states)"
+ },
+ "functions": [
+  {
+   "addr": "0x00017570",
+   "name": "character_set_behaviour",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00022020",
+   "name": "vblank_callback",
+   "sig": "void vblank_callback(void)",
+   "notes": "The title's D3D vertical-blank callback: bumps g_vblank_counter.",
+   "source": "CLAUDE.md"
+  },
+  {
+   "addr": "0x000245C0",
+   "name": "memcpy",
+   "sig": "void * memcpy(void *dst, void *src, uint n)",
+   "notes": "MSVC CRT memcpy; replaced natively in src/recomp_manual.c (it jumps into its own middle).",
+   "source": "CLAUDE.md"
+  },
+  {
+   "addr": "0x000389B0",
+   "name": "noop",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0003C9B0",
+   "name": "option_gamemode",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00042710",
+   "name": "pad_is_connected",
+   "sig": "int pad_is_connected(int port)",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00042720",
+   "name": "pads_assign_players",
+   "sig": "void pads_assign_players(void)",
+   "notes": "Fills g_player_port[] with the connected ports in order.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00042830",
+   "name": "pad_mask_buttons",
+   "sig": "void pad_mask_buttons(int player, uint mask)",
+   "notes": "Sets bits in PadState.mask and clears them from buttons: a held button is ignored until released.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00042870",
+   "name": "pad_neutralise",
+   "sig": "void pad_neutralise(int player)",
+   "notes": "Clears a player's pad record to neutral (sticks 0x80, all buttons masked); called when a player has no control.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000428D0",
+   "name": "pads_neutralise_all",
+   "sig": "void pads_neutralise_all(void)",
+   "notes": "pad_neutralise for all four records.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00042920",
+   "name": "pad_set_deadzone",
+   "sig": "void pad_set_deadzone(int player, float deadzone)",
+   "notes": "Sets PadState.deadzone; player_read_look_move sets 0.25 before reading the move stick.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00042970",
+   "name": "pad_axis",
+   "sig": "float pad_axis(int player, int axis)",
+   "notes": "One analog input of a player's pad as -1..1 after the pad's deadzone (PadState.deadzone). axis: 1 lx, 2 ly, 3 rx, 4 ry, 5/6 triggers (PadState word 6 + axis). Returns 0 while g_pads_frozen.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00042A30",
+   "name": "pad_axis_raw",
+   "sig": "uint8_t pad_axis_raw(int player, int axis)",
+   "notes": "pad_axis without scaling: the 0..255 byte (0x80 while g_pads_frozen).",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00042AE0",
+   "name": "pad_axis_or_buttons",
+   "sig": "float pad_axis_or_buttons(int player, int axis, uint neg_buttons, uint pos_buttons)",
+   "notes": "pad_axis plus a digital direction from two buttons (the D-pad), clamped to -1..1.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000438B0",
+   "name": "pads_update",
+   "sig": "void pads_update(void)",
+   "notes": "Once a frame: polls all four ports into g_pads (pad_poll_port) and copies a few fields to 0x7E7220.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00056EC0",
+   "name": "devflags_copy",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00058C70",
+   "name": "character_set_scale",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00062610",
+   "name": "level_pak_path",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000640C0",
+   "name": "score_kills",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00064160",
+   "name": "team_score",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000641C0",
+   "name": "score",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00064240",
+   "name": "contender_leader",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00064350",
+   "name": "contender_last_placed",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00064460",
+   "name": "score_add",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000644D0",
+   "name": "score_record_kill",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000654E0",
+   "name": "escort_vip_armour",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00065590",
+   "name": "zones_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000674C0",
+   "name": "match_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00067CD0",
+   "name": "bagtag_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00067E60",
+   "name": "ctb_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00067F00",
+   "name": "tag_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000681C0",
+   "name": "match_update",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00069F30",
+   "name": "setup_load",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0006A850",
+   "name": "level_info",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0006B100",
+   "name": "record_mode_included",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0006BC50",
+   "name": "spawner_character_slot",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0006BD30",
+   "name": "weapon_slot_list",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0006C1E0",
+   "name": "spawn_pad_choose",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009B2F0",
+   "name": "path_across_groups_expand",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009B540",
+   "name": "path_across_groups",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009B730",
+   "name": "path_within_group_push",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009B8A0",
+   "name": "pad_link_cost",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009B900",
+   "name": "path_within_group_expand",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009BAE0",
+   "name": "path_within_group",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009CC40",
+   "name": "pad_index",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009D830",
+   "name": "pad_links_list",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0009DEB0",
+   "name": "pad_groups_build",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000A0D90",
+   "name": "use_select",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000A5CE0",
+   "name": "object_set_callback",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000A6880",
+   "name": "use_in_range",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B06C0",
+   "name": "door_may_open",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B80A0",
+   "name": "switch_activate",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B8440",
+   "name": "spawner_act_44",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B84F0",
+   "name": "spawner_act_42",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B8610",
+   "name": "spawner_act_43",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B88D0",
+   "name": "switch_use",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B8D60",
+   "name": "switch_update",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B8E90",
+   "name": "script_cb_3f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B8EE0",
+   "name": "script_cb_42",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B8FA0",
+   "name": "switch_place",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000B9790",
+   "name": "damage_amount",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000BA310",
+   "name": "character_damage",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000BABA0",
+   "name": "character_killed",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000BE1D0",
+   "name": "bag_returned_message",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000BE860",
+   "name": "pickup_object",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000BFFE0",
+   "name": "bag_touch",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000C09B0",
+   "name": "bag_capture",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000C11A0",
+   "name": "base_zone_touch",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000C3890",
+   "name": "character_contact_fire",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000C5C40",
+   "name": "camera_table_build",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000C6100",
+   "name": "camera_sequence_start",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000CB3B0",
+   "name": "camera_default_fov",
+   "sig": "float camera_default_fov(Camera *c)",
+   "notes": "45 (g_fov_default_alt) when c+0x254 == 0 and c+0x258 == 1, else 55 (g_fov_default).",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000CF200",
+   "name": "player_control_axis",
+   "sig": "float player_control_axis(Player *p, int action)",
+   "notes": "The analog value of a control action through the player's control scheme: pad_axis(p->pad_index, p->control_axis[action]), or 0 when the action is unbound. Actions are listed under \"actions\".",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000D0E30",
+   "name": "player_update_state10000",
+   "sig": "void player_update_state10000(void)",
+   "notes": "move_state 0x10000: drives two sub-objects' angles from both sticks.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000D2470",
+   "name": "player_update_state400",
+   "sig": "void player_update_state400(void)",
+   "notes": "move_state 0x400: a mounted or vehicle mode with its own yaw clamp (+-180) and look read from pad_axis 3/4 directly.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000D5C70",
+   "name": "player_state_dispatch",
+   "notes": "Switch on Player.move_state: 2 player_move_walk, 0x400 player_update_state400, 0x10000 player_update_state10000, and 4, 8, 0x10, 0x20, 0x40, 0x80, 0x100, 0x800, 0x2000, 0x4000, 0x8000, 0x20000, 0x40000, 0x100000.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000D5EB0",
+   "name": "player_update",
+   "sig": "void player_update(void)",
+   "notes": "Per-frame update of g_player: saves prev yaw/pitch, player_read_look_move -> player_apply_look -> player_state_dispatch (movement per move_state) -> animation.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x000D6C90",
+   "name": "character_is_monkey",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x000EAAF0",
+   "name": "projectile_create",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00111AE0",
+   "name": "emitter_start",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00120F70",
+   "name": "gladiator_mark",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001252C0",
+   "name": "character_ignite",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00126280",
+   "name": "contact_fire",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001538C0",
+   "name": "game_clock_step",
+   "notes": "Caps the per-frame vblank step at 3 and accumulates g_game_clock.",
+   "source": "CLAUDE.md"
+  },
+  {
+   "addr": "0x001596F0",
+   "name": "path_next_pad",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0015BFF0",
+   "name": "bots_set_behaviour",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0015C700",
+   "name": "character_apply_behaviour",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0015D500",
+   "name": "move_to_pad",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0015DDA0",
+   "name": "character_remove",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0015DF20",
+   "name": "spawner_spawn",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0015E4F0",
+   "name": "bots_reset",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00160B00",
+   "name": "pad_links_relax",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00160F00",
+   "name": "alert_raise",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00161E50",
+   "name": "zone_release_characters",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162170",
+   "name": "spawner_act_01",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162200",
+   "name": "spawner_act_04",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162250",
+   "name": "spawner_act_23",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001622B0",
+   "name": "spawner_act_16",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001622C0",
+   "name": "spawner_act_02",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162340",
+   "name": "spawner_act_03",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001623E0",
+   "name": "spawner_act_05",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001623F0",
+   "name": "spawner_act_0d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162450",
+   "name": "spawner_act_09",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162520",
+   "name": "spawner_act_0b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001625F0",
+   "name": "spawner_act_0a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162710",
+   "name": "spawner_act_08",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001627A0",
+   "name": "spawner_act_06",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001627C0",
+   "name": "spawner_act_0c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162830",
+   "name": "spawner_act_22",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162870",
+   "name": "spawner_act_21",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001628D0",
+   "name": "spawner_act_1f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001629A0",
+   "name": "spawner_act_20",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162A00",
+   "name": "spawner_act_0e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162B50",
+   "name": "spawner_act_0f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162CA0",
+   "name": "spawner_act_10",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162E00",
+   "name": "spawner_act_11",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00162F60",
+   "name": "spawner_act_12",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001630C0",
+   "name": "spawner_act_13",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163220",
+   "name": "spawner_act_14",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163300",
+   "name": "spawner_act_15",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163440",
+   "name": "spawner_act_17",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001634D0",
+   "name": "spawner_act_18",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163590",
+   "name": "spawner_act_19",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163600",
+   "name": "spawner_act_1e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163830",
+   "name": "spawner_act_07",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001638A0",
+   "name": "spawner_act_1d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163AF0",
+   "name": "spawner_act_2a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163B40",
+   "name": "spawner_act_26",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163BD0",
+   "name": "spawner_act_2e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163C50",
+   "name": "spawner_act_2d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163CF0",
+   "name": "spawner_act_2c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163D90",
+   "name": "spawner_act_27",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00163E10",
+   "name": "spawner_act_2b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00164010",
+   "name": "spawner_activate",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0018FF70",
+   "name": "pad_poll_port",
+   "sig": "void pad_poll_port(PadState *pad, int port)",
+   "notes": "Reads XInputGetState for one port into a PadState: buttons through the table at 0x47DF00, analog buttons > 0x3C count as held, sticks and triggers mapped to 0..255 (0x80 centre) with the per-port calibration at 0x74D0A5 + port*0x19. Also sends rumble.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x001BFEC0",
+   "name": "ammo_weapon_lookup",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001C0200",
+   "name": "weapon_fire",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001C55F0",
+   "name": "uplink_class_events",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D5E10",
+   "name": "script_cb_27",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D5E40",
+   "name": "script_cb_2b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D5ED0",
+   "name": "script_cb_24",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D80D0",
+   "name": "l1_chandelier_update",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D83F0",
+   "name": "script_cb_25",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D84E0",
+   "name": "script_cb_26",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D88B0",
+   "name": "l1_tree_topple",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D89E0",
+   "name": "script_cb_31_camera_tflc",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D8A10",
+   "name": "script_cb_32_tree_strike",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D8C40",
+   "name": "script_cb_2a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D9600",
+   "name": "script_cb_29",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D9700",
+   "name": "spawner_act_3e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001D9730",
+   "name": "l1_register_object_callbacks",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001DD420",
+   "name": "script_cb_23",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001DE520",
+   "name": "script_cb_09",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001DE790",
+   "name": "script_cb_05",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E0250",
+   "name": "script_cb_0d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E1DC0",
+   "name": "spawner_act_28",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E1DE0",
+   "name": "spawner_act_29",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E1E00",
+   "name": "script_cb_02",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E1EE0",
+   "name": "script_cb_01",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E2020",
+   "name": "script_cb_0a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E21E0",
+   "name": "script_cb_03",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E4B70",
+   "name": "script_cb_07",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E4BA0",
+   "name": "script_cb_40",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E4BC0",
+   "name": "script_cb_44",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E4C80",
+   "name": "script_cb_45",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E4D50",
+   "name": "script_cb_0c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E4D80",
+   "name": "script_cb_04",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E69E0",
+   "name": "script_cb_43",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001E80E0",
+   "name": "script_cb_41",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EA780",
+   "name": "spawner_act_33",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EB2F0",
+   "name": "script_cb_0e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EBF50",
+   "name": "script_cb_11",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EC7A0",
+   "name": "spawner_act_34",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EC840",
+   "name": "spawner_act_31",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EC890",
+   "name": "spawner_act_32",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001ED030",
+   "name": "script_cb_47",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001ED6B0",
+   "name": "script_cb_1b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001ED6D0",
+   "name": "script_cb_12",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001ED720",
+   "name": "script_cb_14",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001ED760",
+   "name": "script_cb_13",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EDAE0",
+   "name": "script_cb_17",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001EDB20",
+   "name": "script_cb_16",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F1D30",
+   "name": "script_cb_22",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F1D60",
+   "name": "script_cb_2e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F1D90",
+   "name": "script_cb_46",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F1E90",
+   "name": "script_cb_4a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F20A0",
+   "name": "script_cb_06",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F2AA0",
+   "name": "script_cb_19",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F2AE0",
+   "name": "script_cb_1a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F3360",
+   "name": "script_cb_0f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F4320",
+   "name": "script_cb_18",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F4460",
+   "name": "spawner_act_35",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F44C0",
+   "name": "script_cb_15",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F73F0",
+   "name": "script_cb_48",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F8C60",
+   "name": "script_cb_35",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F9CE0",
+   "name": "script_cb_52",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001F9D50",
+   "name": "script_cb_53",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FB5E0",
+   "name": "script_cb_34",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FB860",
+   "name": "script_cb_33",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FBC20",
+   "name": "script_cb_38",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FBC80",
+   "name": "script_cb_37",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FBD60",
+   "name": "script_cb_36",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FCE90",
+   "name": "script_cb_3b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FD530",
+   "name": "script_cb_39",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x001FE9E0",
+   "name": "script_cb_54",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002021B0",
+   "name": "script_cb_3a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00202260",
+   "name": "script_cb_73",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00205FC0",
+   "name": "script_cb_51",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00208030",
+   "name": "assault_handler_l29",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00208510",
+   "name": "spawner_act_3c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00208A20",
+   "name": "script_cb_60",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020C800",
+   "name": "spawner_act_40",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020C920",
+   "name": "script_cb_62",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020C960",
+   "name": "script_cb_63",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020D1F0",
+   "name": "script_cb_6f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020D380",
+   "name": "script_cb_55",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020E430",
+   "name": "script_cb_5a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020E810",
+   "name": "script_cb_61",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0020FB50",
+   "name": "script_cb_4d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00210680",
+   "name": "spawner_act_36",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00210820",
+   "name": "script_cb_1d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00210840",
+   "name": "script_cb_1e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00212130",
+   "name": "script_cb_2f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00212160",
+   "name": "script_cb_30",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00212440",
+   "name": "script_cb_1f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00213730",
+   "name": "spawner_act_37",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00215790",
+   "name": "script_cb_69",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002160D0",
+   "name": "script_cb_3d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00216820",
+   "name": "script_cb_3c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00217030",
+   "name": "script_cb_5b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002188E0",
+   "name": "spawner_act_3b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0021B440",
+   "name": "script_cb_5c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0021B510",
+   "name": "script_cb_5e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0021BB90",
+   "name": "spawner_act_3a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0021BBB0",
+   "name": "spawner_act_39",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0021BCA0",
+   "name": "spawner_act_2f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0021BEB0",
+   "name": "script_cb_70",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0021C040",
+   "name": "script_cb_5f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00221A10",
+   "name": "script_cb_6a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00221B60",
+   "name": "spawner_act_38",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00222140",
+   "name": "assault_handler_l27",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00222DA0",
+   "name": "spawner_act_3d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00222E70",
+   "name": "spawner_act_3f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00223890",
+   "name": "spawner_act_48",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00224480",
+   "name": "script_cb_4e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00224550",
+   "name": "script_cb_4f",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00224730",
+   "name": "script_cb_74",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00224980",
+   "name": "script_cb_5d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00225350",
+   "name": "script_cb_50",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00225A50",
+   "name": "assault_handler_l59",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002273C0",
+   "name": "objective_is_complete",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002274C0",
+   "name": "objective_complete",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00227750",
+   "name": "objective_create",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002279D0",
+   "name": "objective_register_target",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00228C80",
+   "name": "challenge_zombie_score",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022A040",
+   "name": "challenge_exit_with_item",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022A090",
+   "name": "challenge_exit_marker",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022CD30",
+   "name": "challenge_alloc",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022CEB0",
+   "name": "challenge_reset",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022D4E0",
+   "name": "challenge_compare",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022D570",
+   "name": "challenge_statistic",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022D780",
+   "name": "challenge_index",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022DCC0",
+   "name": "challenge_zombie_spawn",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022DD10",
+   "name": "challenge_zombie_killed",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0022E090",
+   "name": "challenge_zombie_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00230920",
+   "name": "challenge_medal",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00230CC0",
+   "name": "challenge_record_mask",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00231760",
+   "name": "challenge_per_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00231A20",
+   "name": "challenge_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00232150",
+   "name": "assault_current_stage",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00232270",
+   "name": "assault_tick",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00232EA0",
+   "name": "assault_map_handler",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002332F0",
+   "name": "assault_stage_callback",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002338D0",
+   "name": "assault_stages_setup",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002344D0",
+   "name": "script_latch_switch",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002345B0",
+   "name": "spawner_act_45",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234A30",
+   "name": "script_cb_1c_zone_release",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234A50",
+   "name": "script_cb_20_player1_to_pad",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234AC0",
+   "name": "script_cb_21_player2_to_pad",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234C70",
+   "name": "script_cb_4b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234CA0",
+   "name": "script_cb_4c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234D00",
+   "name": "script_cb_56",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234D40",
+   "name": "script_cb_59",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00234DA0",
+   "name": "script_cb_57",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002351D0",
+   "name": "script_latch_next",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00235240",
+   "name": "script_watch_conditions",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00235630",
+   "name": "script_load",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002359A0",
+   "name": "script_gates",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00235FC0",
+   "name": "script_active_list",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00236070",
+   "name": "script_execute",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00237E70",
+   "name": "script_schedule",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0023FF20",
+   "name": "instance_by_tag",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00249960",
+   "name": "script_cb_2c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0024A100",
+   "name": "script_cb_2d_ghosts",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0024ABA0",
+   "name": "ghost_think",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0024D220",
+   "name": "script_cb_10",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00258F50",
+   "name": "player_move_walk",
+   "notes": "move_state 2: on foot.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x0025C440",
+   "name": "player_to_pad",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0025C650",
+   "name": "player_move_animation",
+   "sig": "void player_move_animation(float move_x, float move_y)",
+   "notes": "Chooses the walk/strafe animation from the move vector.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x0025CE80",
+   "name": "player_read_look_move",
+   "sig": "void player_read_look_move(float *look, float *move)",
+   "notes": "Reads g_player's look (action 0x11 negated = x, 0x10 = y; circular stick response look*|look|) and move (0x0E, 0x0F) inputs. The move rate may only change by a per-speed step from last frame's (Player.move_rate): that is the walking acceleration. Zeroes both while move_state has a bit of 0x22100. With aim_lock, or in move_state 0x40 (or 0x80 on a ladder-like object), it reads the alternate actions 0x12-0x15 instead and honours the profile's invert-look bit.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x0025D520",
+   "name": "player_apply_look",
+   "sig": "void player_apply_look(float *look, float *move, float *look_out)",
+   "notes": "Integrates the look input into the camera angles: yaw += aim_turn_scale * g_yaw_speed * look.x * frame_time * (camera fov / default fov), wrapped to [0,360); pitch the same with g_pitch_speed, clamped to +-g_pitch_limit. Only while the player has control ((char)flags < 0, or camera mode 0x18) and move_state is not 0x20/0x40/0x80/0x100. Wrapped in src/recomp_manual.c to add mouse look.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x0025F0C0",
+   "name": "script_cb_08",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0025F250",
+   "name": "spawner_act_24",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0025F370",
+   "name": "group_dead_count",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0025F4C0",
+   "name": "spawner_act_1a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0025F520",
+   "name": "spawner_act_1b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0025F630",
+   "name": "spawner_act_1c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00261990",
+   "name": "ai_wait_condition",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00262B20",
+   "name": "ai_leave_level",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00263260",
+   "name": "ai_ride_q",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00263710",
+   "name": "bot_think_ctb_q",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002682A0",
+   "name": "ai_list_execute",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002723A0",
+   "name": "assault_squad_join",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00272450",
+   "name": "script_cb_71",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002740F0",
+   "name": "assault_squad_order",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00274210",
+   "name": "assault_squads_setup",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002743A0",
+   "name": "team_bag_home",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276160",
+   "name": "ai_buddy_defaults",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002768C0",
+   "name": "buddy_cond_07",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002768F0",
+   "name": "buddy_cond_05",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276A00",
+   "name": "buddy_cond_02",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276A10",
+   "name": "buddy_cond_01",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276A80",
+   "name": "buddy_cond_06",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276CA0",
+   "name": "buddy_cond_0a",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276CB0",
+   "name": "buddy_cond_09",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276CE0",
+   "name": "buddy_cond_0d",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276D10",
+   "name": "buddy_cond_0b",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00276EF0",
+   "name": "buddy_cond_0c",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002770D0",
+   "name": "buddy_cond_04",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002784D0",
+   "name": "ai_buddy",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0027C2F0",
+   "name": "gladiator_killed",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0027D590",
+   "name": "ai_dispatch",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0027DF60",
+   "name": "ai_dispatch_arcade",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0027F8E0",
+   "name": "ai_dispatch_low",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0027FE30",
+   "name": "ai_think",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002B4C70",
+   "name": "bot_respawn",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002B51E0",
+   "name": "arcade_setup",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002B55D0",
+   "name": "bot_mode_goal_q",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002B60A0",
+   "name": "bot_nearest_foreign_zone",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002B7750",
+   "name": "bot_think_ctb",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002B7CC0",
+   "name": "bot_think",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x002B7F30",
+   "name": "bot_attack",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0034EB00",
+   "name": "uplink_target_filter",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0034EEE0",
+   "name": "uplink_release",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0034F080",
+   "name": "uplink_hold_static",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x0034F5B0",
+   "name": "uplink_hold_physics",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x003501E0",
+   "name": "uplink_target",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x003508B0",
+   "name": "uplink_grab",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x003661F0",
+   "name": "script_cb_28",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x003757E0",
+   "name": "script_cb_3e",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00376550",
+   "name": "script_cb_58",
+   "source": "Ghidra, tsfp-rewrite project"
+  }
+ ],
+ "globals": [
+  {
+   "addr": "0x004785CC",
+   "name": "g_fov_default",
+   "type": "float",
+   "notes": "55.0",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00478900",
+   "name": "g_fov_default_alt",
+   "type": "float",
+   "notes": "45.0",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x004C0474",
+   "name": "cmdline_option_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004D1F7C",
+   "name": "game_type_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004D29C8",
+   "name": "spawner_activation_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004D2B10",
+   "name": "script_callback_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004DAD48",
+   "name": "damage_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004DEB54",
+   "name": "projectile_types",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004E794C",
+   "name": "g_ticks_per_frame",
+   "type": "float",
+   "notes": "2.0 at 60 Hz: vblanks per game frame (the game logic runs at 30).",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x004E8CEC",
+   "name": "g_ticks_per_second",
+   "type": "int",
+   "notes": "60: frame_time = g_ticks_per_frame / g_ticks_per_second.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x004EA3F8",
+   "name": "ammo_types",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004EEF74",
+   "name": "weapon_classes",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004FA13C",
+   "name": "weapon_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x004FB190",
+   "name": "weapon_items",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00510788",
+   "name": "challenge_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00513D04",
+   "name": "league_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00515FFC",
+   "name": "level_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00520628",
+   "name": "buddy_condition_table",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00563918",
+   "name": "g_vblank_counter",
+   "type": "uint",
+   "notes": "Bumped by vblank_callback (CLAUDE.md fix 16).",
+   "source": "CLAUDE.md"
+  },
+  {
+   "addr": "0x006B93C0",
+   "name": "g_player_port",
+   "type": "int[4]",
+   "notes": "Port of each player (pads_assign_players); the pad_* functions index it with the player number.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x006B93D0",
+   "name": "g_pads",
+   "type": "PadState[4]",
+   "notes": "One PadState per port, 0x3C bytes each.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x006B94C8",
+   "name": "g_pads_alt",
+   "type": "PadState[4]",
+   "notes": "Used instead of g_pads when 0x76B0FC is non-zero.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x006B9888",
+   "name": "g_pads_frozen",
+   "type": "int",
+   "notes": "Non-zero: the pad getters return neutral values.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x00732A04",
+   "name": "door_records",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x007497B0",
+   "name": "g_game_clock",
+   "type": "uint",
+   "notes": "Game clock: accumulated vblank steps (CLAUDE.md fix 16; RECOMP_FPS_WATCH target).",
+   "source": "CLAUDE.md"
+  },
+  {
+   "addr": "0x0074D0FC",
+   "name": "g_xinput_connected_mask",
+   "type": "uint",
+   "notes": "Bit per port.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x0074D100",
+   "name": "g_xinput_handles",
+   "type": "uint[4]",
+   "notes": "XInputOpen handle per port.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007A2BC8",
+   "name": "tag_burning_bits",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x007A2D80",
+   "name": "alert_slots",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x007A38A0",
+   "name": "g_sin_table",
+   "type": "float[2048]",
+   "notes": "sin over 2048 steps a turn; cos is index + 0x200.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007B0C7C",
+   "name": "g_player",
+   "type": "Player *",
+   "notes": "The player being updated (player_update runs once per local player).",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007B0C80",
+   "name": "g_pitch_limit",
+   "type": "float",
+   "notes": "60.0: pitch is clamped to +-this (degrees).",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007B0CB8",
+   "name": "g_yaw_speed",
+   "type": "float",
+   "notes": "160.0: degrees a second at full look stick.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007B0CBC",
+   "name": "g_pitch_speed",
+   "type": "float",
+   "notes": "68.0: degrees a second at full look stick.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007B0CC0",
+   "name": "g_camera",
+   "type": "Camera *",
+   "notes": "The current player's camera.",
+   "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007DE308",
+   "name": "monkeys_helped",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x007DE320",
+   "name": "gladiator",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x007DE400",
+   "name": "match",
+   "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x007EB300",
+   "name": "match_options",
+   "source": "Ghidra, tsfp-rewrite project"
+  }
+ ],
+ "structs": [
+  {
+   "name": "PadState",
+   "size": "0x3C",
+   "notes": "g_pads[port]. Written by pad_poll_port.",
+   "source": "mouse look (2026-10-10)",
+   "fields": [
+    {
+     "off": "0x00",
+     "name": "deadzone",
+     "type": "float",
+     "notes": "pad_axis deadzone, 0..1"
+    },
+    {
+     "off": "0x04",
+     "name": "connected",
+     "type": "int"
+    },
+    {
+     "off": "0x08",
+     "name": "buttons_prev",
+     "type": "uint"
+    },
+    {
+     "off": "0x0C",
+     "name": "buttons",
+     "type": "uint",
+     "notes": "game button bits (the table at 0x47DF00 maps XInput bits)"
+    },
+    {
+     "off": "0x10",
+     "name": "pressed",
+     "type": "uint",
+     "notes": "went down this frame"
+    },
+    {
+     "off": "0x14",
+     "name": "released",
+     "type": "uint",
+     "notes": "went up this frame"
+    },
+    {
+     "off": "0x18",
+     "name": "axis0",
+     "type": "int",
+     "notes": "axis slot 0, unused"
+    },
+    {
+     "off": "0x1C",
+     "name": "lx",
+     "type": "int",
+     "notes": "0..255, 0x80 centre"
+    },
+    {
+     "off": "0x20",
+     "name": "ly",
+     "type": "int",
+     "notes": "0..255, up is above 0x80"
+    },
+    {
+     "off": "0x24",
+     "name": "rx",
+     "type": "int"
+    },
+    {
+     "off": "0x28",
+     "name": "ry",
+     "type": "int"
+    },
+    {
+     "off": "0x2C",
+     "name": "ltrigger",
+     "type": "int"
+    },
+    {
+     "off": "0x30",
+     "name": "rtrigger",
+     "type": "int"
+    },
+    {
+     "off": "0x34",
+     "name": "rumble",
+     "type": "int"
+    },
+    {
+     "off": "0x38",
+     "name": "mask",
+     "type": "uint",
+     "notes": "buttons ignored until released (pad_mask_buttons)"
+    }
+   ]
+  },
+  {
+   "name": "Player",
+   "size": "0x1600",
+   "notes": "The local player controller (g_player). Lives in contiguous memory (0x8xxxxxxx), which RECOMP_RAM_DUMP now writes as contig_<s>.bin.",
+   "source": "mouse look (2026-10-10)",
+   "fields": [
+    {
+     "off": "0x000",
+     "name": "pad_index",
+     "type": "int",
+     "notes": "player number handed to pad_axis (0 = player 1)"
+    },
+    {
+     "off": "0x00C",
+     "name": "flags",
+     "type": "uint",
+     "notes": "byte 0 bit 7: has control (player_apply_look integrates look only then)"
+    },
+    {
+     "off": "0x010",
+     "name": "flags_prev",
+     "type": "uint"
+    },
+    {
+     "off": "0x014",
+     "name": "character",
+     "type": "void *",
+     "notes": "the character object; +0x7C its data"
+    },
+    {
+     "off": "0x018",
+     "name": "control_axis",
+     "type": "int[32]",
+     "notes": "pad axis bound to each control action (player_control_axis)"
+    },
+    {
+     "off": "0x100",
+     "name": "yaw",
+     "type": "float",
+     "notes": "degrees, [0,360); grows turning right"
+    },
+    {
+     "off": "0x104",
+     "name": "pitch",
+     "type": "float",
+     "notes": "degrees, +-g_pitch_limit; positive looks up"
+    },
+    {
+     "off": "0x108",
+     "name": "look_mode",
+     "type": "int",
+     "notes": "0/1/2: look-spring state in player_apply_look"
+    },
+    {
+     "off": "0x114",
+     "name": "move_state",
+     "type": "uint",
+     "notes": "one bit: 2 on foot, 0x400 mounted, ... (player_state_dispatch); 0x22100 bits zero the look and move input"
+    },
+    {
+     "off": "0x11C",
+     "name": "speed_class",
+     "type": "int",
+     "notes": "indexes the per-speed tables at 0x49F2A0"
+    },
+    {
+     "off": "0x164",
+     "name": "yaw_prev",
+     "type": "float",
+     "notes": "yaw at the start of player_update"
+    },
+    {
+     "off": "0x168",
+     "name": "pitch_prev",
+     "type": "float"
+    },
+    {
+     "off": "0xF5C",
+     "name": "aim_lock",
+     "type": "int",
+     "notes": "non-zero: player_read_look_move reads the alternate look/move actions"
+    },
+    {
+     "off": "0xF7C",
+     "name": "aiming",
+     "type": "int",
+     "notes": "non-zero: aim_turn_scale eases to 0.65"
+    },
+    {
+     "off": "0xF80",
+     "name": "aim_turn_scale",
+     "type": "float",
+     "notes": "1.0, eases to 0.65 while aiming"
+    },
+    {
+     "off": "0xFC4",
+     "name": "move_rate",
+     "type": "float[2]",
+     "notes": "last frame's accelerated move input (player_read_look_move)"
+    },
+    {
+     "off": "0xFCC",
+     "name": "move_out",
+     "type": "float[2]"
+    },
+    {
+     "off": "0xFD4",
+     "name": "look_out",
+     "type": "float[2]",
+     "notes": "look input after player_apply_look's shaping"
+    },
+    {
+     "off": "0x1500",
+     "name": "controls",
+     "type": "void *",
+     "notes": "profile control settings: +2 bit 0 invert look, +0x74 control style"
+    }
+   ]
+  },
+  {
+   "name": "Camera",
+   "size": "0x400",
+   "notes": "g_camera.",
+   "source": "mouse look (2026-10-10)",
+   "fields": [
+    {
+     "off": "0x254",
+     "name": "mode_a",
+     "type": "int"
+    },
+    {
+     "off": "0x258",
+     "name": "mode_b",
+     "type": "int"
+    },
+    {
+     "off": "0x26C",
+     "name": "mode",
+     "type": "int *",
+     "notes": "*mode == 0x18: a camera mode in which look is integrated without player control"
+    },
+    {
+     "off": "0x384",
+     "name": "fov",
+     "type": "float",
+     "notes": "current field of view; zooming lowers it, and the look speed with it"
+    }
+   ]
+  }
+ ]
+}

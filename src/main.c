@@ -40,6 +40,7 @@
 /* xboxrecomp runtime headers */
 #include <xbox/xboxrecomp.h>
 #include "xbox_watchpoint.h"
+#include "recomp_mouse.h"
 
 /*
  * If xboxrecomp.h is not an umbrella header in your setup, include
@@ -525,6 +526,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     /* And the other way a run ends: an exit nobody logged. Prints [EXIT]
      * with the code and both stacks before the process goes (exit_trace.c). */
     recomp_exit_trace_init();
+
+    /* Mouse look is this title's own (sub_0025D520 in recomp_manual.c turns
+     * the camera with raw mouse counts), so the runtime may capture the
+     * cursor. Before the game window opens, so it is captured at once. */
+    recomp_mouse_title_has_look();
 
     /* Step 1: Find and load the XBE */
     {

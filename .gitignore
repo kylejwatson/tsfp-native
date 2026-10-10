@@ -11,7 +11,7 @@ bin/
 *.pdb
 *.ilk
 *.exp
-ghidra/
+/ghidra/
 game_files/
 
 # CMake
@@ -76,3 +76,5 @@ adump*/
 *.bmp
 *.raw
 level_seq.txt
+# Your own input recordings (record.bat): they replay your profile, not anyone else's.
+recordings/

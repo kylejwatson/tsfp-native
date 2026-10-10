@@ -1,0 +1,13 @@
+# Challenge > Behead the Undead > Brain Drain: gameplay at ~45 s.
+# Needs the "Player 1" profile at index 1 in game_files/UDATA.
+# Times are milliseconds from the first pad read; <ms>:<control>[+<control>][:<hold ms>].
+14000:a          # press start screen
+17000:down+a     # profile: Player 1
+21000:down
+22000:down       # main menu: Challenge
+23500:a
+27000:a          # Behead the Undead
+30000:a          # Brain Drain
+33000:a          # briefing
+36000:a          # character
+39000:a          # ready

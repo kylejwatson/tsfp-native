@@ -128,6 +128,85 @@ void sub_000245C0(void)
     g_esp += 4;     /* the `ret` */
 }
 
+/* sub_0025D520 (player_apply_look, re/names.json): mouse look.
+ *
+ * Wrapped, not replaced: the generated body runs first and integrates the
+ * stick into the camera angles as it always did, then the mouse movement
+ * since the last frame is added to them directly -- degrees per count, no
+ * stick, so no deadzone, response curve or acceleration ramp between the
+ * hand and the aim. The pad keeps working beside it.
+ *
+ * What the stick path does that is kept: it only turns while the player has
+ * control and in the movement states that look at all, the yaw wraps into
+ * [0,360) and the pitch is clamped to +-g_pitch_limit (60), and the turn is
+ * scaled by the camera's fov over its default one so a zoomed scope does not
+ * swing wildly. Not kept: the 0.65 slow-down while aiming (aim_turn_scale),
+ * which is there for a thumb, and auto-aim.
+ *
+ * Pitch: positive looks up; mouse y grows downwards, so it is subtracted.
+ * Checked in Brain Drain with RECOMP_INPUT_SEQ's mouse steps: 1000 counts
+ * right turned 55.00 degrees, 300 up raised the view 16.50 to the ceiling. */
+#include "recomp_mouse.h"
+#include "tsfp_names.h"
+
+extern void sub_0025D520_gen(void);
+
+#define GUEST_U32(va) (*(volatile uint32_t *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
+#define GUEST_F32(va) (*(volatile float *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
+#define GUEST_S8(va)  (*(volatile int8_t *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
+
+static void tsfp_mouse_look(void)
+{
+    uint32_t p, cam, state, mode;
+    long dx, dy;
+    float scale = 1.0f, yaw, pitch, limit;
+    int control;
+
+    /* Taken every frame the look runs, used or not: what arrives while the
+     * player has no control (a cutscene, a death) is dropped, not saved up. */
+    if (!recomp_mouse_take_motion(&dx, &dy))
+        return;
+    p = GUEST_U32(TSFP_G_PLAYER);
+    if (!p || GUEST_U32(p + TSFP_PLAYER_PAD_INDEX) != 0)
+        return;                                 /* the mouse is player 1's */
+    state = GUEST_U32(p + TSFP_PLAYER_MOVE_STATE);
+    if (state == 0x20 || state == 0x40 || state == 0x80 || state == 0x100)
+        return;                                 /* states that do not look */
+    cam = GUEST_U32(TSFP_G_CAMERA);
+    mode = cam ? GUEST_U32(cam + TSFP_CAMERA_MODE) : 0;
+    control = GUEST_S8(p + TSFP_PLAYER_FLAGS) < 0 ||
+              (mode && GUEST_U32(mode) == 0x18 && state != 0x400 && state != 0x200);
+    if (!control)
+        return;
+    if (cam) {
+        float def = (GUEST_U32(cam + TSFP_CAMERA_MODE_A) == 0 && GUEST_U32(cam + TSFP_CAMERA_MODE_B) == 1)
+                    ? GUEST_F32(TSFP_G_FOV_DEFAULT_ALT) : GUEST_F32(TSFP_G_FOV_DEFAULT);
+        float fov = GUEST_F32(cam + TSFP_CAMERA_FOV);
+        if (def > 1.0f && fov > 1.0f && fov <= def)
+            scale = fov / def;
+    }
+
+    yaw = GUEST_F32(p + TSFP_PLAYER_YAW) + (float)recomp_mouse_counts_to_degrees(dx) * scale;
+    while (yaw < 0.0f)
+        yaw += 360.0f;
+    while (yaw >= 360.0f)
+        yaw -= 360.0f;
+    limit = GUEST_F32(TSFP_G_PITCH_LIMIT);
+    pitch = GUEST_F32(p + TSFP_PLAYER_PITCH) - (float)recomp_mouse_counts_to_degrees(dy) * scale;
+    if (pitch > limit)
+        pitch = limit;
+    if (pitch < -limit)
+        pitch = -limit;
+    GUEST_F32(p + TSFP_PLAYER_YAW) = yaw;
+    GUEST_F32(p + TSFP_PLAYER_PITCH) = pitch;
+}
+
+void sub_0025D520(void)
+{
+    sub_0025D520_gen();
+    tsfp_mouse_look();
+}
+
 /* ── Manual function overrides ─────────────────────────────── */
 
 /*

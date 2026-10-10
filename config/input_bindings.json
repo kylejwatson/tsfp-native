@@ -1,4 +1,5 @@
 {
+  "mouse": { "look": true, "sensitivity": 2.5, "invert_y": false },
   "controllers": [
     {
       "port": 1,
@@ -18,11 +19,11 @@
         "a":            ["pad:a", "key:Z", "key:SPACE"],
         "b":            ["pad:b", "key:X"],
         "x":            ["pad:x", "key:C"],
-        "y":            ["pad:y", "key:V"],
+        "y":            ["pad:y", "key:V", "mouse:wheel_up", "mouse:wheel_down"],
         "white":        ["pad:rshoulder", "key:Q"],
         "black":        ["pad:lshoulder", "key:F"],
-        "ltrigger":     ["pad:lt", "key:E", "key:O"],
-        "rtrigger":     ["pad:rt", "key:R", "key:U"]
+        "ltrigger":     ["pad:lt", "key:E", "key:O", "mouse:right"],
+        "rtrigger":     ["pad:rt", "key:R", "key:U", "mouse:left"]
       }
     }
   ]
