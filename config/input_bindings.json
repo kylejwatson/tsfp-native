@@ -19,11 +19,14 @@
         "a":            ["pad:a", "key:Z", "key:SPACE"],
         "b":            ["pad:b", "key:X"],
         "x":            ["pad:x", "key:C"],
-        "y":            ["pad:y", "key:V", "mouse:wheel_up", "mouse:wheel_down"],
+        "y":            ["pad:y", "key:V"],
         "white":        ["pad:rshoulder", "key:Q"],
         "black":        ["pad:lshoulder", "key:F"],
         "ltrigger":     ["pad:lt", "key:E", "key:O", "mouse:right"],
-        "rtrigger":     ["pad:rt", "key:R", "key:U", "mouse:left"]
+        "rtrigger":     ["pad:rt", "key:R", "key:U", "mouse:left"],
+
+        "dpad_left":    ["pad:dpad_left", "key:LEFT", "mouse:wheel_up"],
+        "dpad_right":   ["pad:dpad_right", "key:RIGHT", "mouse:wheel_down"]
       }
     }
   ]

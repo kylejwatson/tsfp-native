@@ -144,6 +144,8 @@ void sub_000245C0(void)
  * which is there for a thumb, and auto-aim.
  *
  * Pitch: positive looks up; mouse y grows downwards, so it is subtracted.
+ * Yaw: grows to the left (counter-clockwise from above), so mouse x, which
+ * grows to the right, is subtracted too (it was added at first: inverted).
  * Checked in Brain Drain with RECOMP_INPUT_SEQ's mouse steps: 1000 counts
  * right turned 55.00 degrees, 300 up raised the view 16.50 to the ceiling. */
 #include "recomp_mouse.h"
@@ -186,7 +188,7 @@ static void tsfp_mouse_look(void)
             scale = fov / def;
     }
 
-    yaw = GUEST_F32(p + TSFP_PLAYER_YAW) + (float)recomp_mouse_counts_to_degrees(dx) * scale;
+    yaw = GUEST_F32(p + TSFP_PLAYER_YAW) - (float)recomp_mouse_counts_to_degrees(dx) * scale;
     while (yaw < 0.0f)
         yaw += 360.0f;
     while (yaw >= 360.0f)
