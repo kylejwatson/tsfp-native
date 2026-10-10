@@ -6,5 +6,9 @@
  {
   "start": "0x002C3500",
   "note": "Indirect-call target observed when opening Settings > Audio/Video options (caller 0x00076C78); unresolved, sub_00076810 then faulted on a garbage pointer."
+ },
+ {
+  "start": "0x00138F70",
+  "note": "Indirect-call target reached at a late Second Level checkpoint (caller 0x00139087); unresolved, the skipped call returned 0 and the guest later jumped to 0x00000000 (from 0x001CDD67)."
  }
 ]
