@@ -1,0 +1,26 @@
+# Line endings: the repository stores LF, and every checkout gets LF, on
+# Windows as well as Linux (MSVC, CMake, Python and git all take LF). Only
+# Windows batch files keep CRLF, because cmd.exe misreads labels and `goto`
+# in an LF batch file. Leave core.autocrlf unset (or false); these rules win.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Shell scripts must stay LF: a CRLF checkout breaks the shebang on Linux
+# ("bad interpreter: /usr/bin/env bash^M").
+*.sh text eol=lf
+
+# Binary: never converted, never diffed as text.
+*.png binary
+*.jpg binary
+*.bmp binary
+*.ico binary
+*.bin binary
+*.xbe binary
+*.iso binary
+*.spv binary
+*.d3dcap binary
+*.wav binary
+*.ttf binary

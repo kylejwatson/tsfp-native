@@ -108,17 +108,30 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${XBOXRECOMP_DIR}/include
 )
 
-# Windows SDK libraries needed at link time
-target_link_libraries(${PROJECT_NAME} PRIVATE
-    d3d11
-    dxgi
-    dxguid
-    xinput
-    winmm
-    # Lets the fault handler resolve the host RIP back to the generated
-    # function's symbol, i.e. to the guest function that faulted.
-    dbghelp
-)
+if(WIN32)
+    # Windows SDK libraries needed at link time
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        d3d11
+        dxgi
+        dxguid
+        xinput
+        winmm
+        # Lets the fault handler resolve the host RIP back to the generated
+        # function's symbol, i.e. to the guest function that faulted.
+        dbghelp
+    )
+else()
+    # Linux (GCC or Clang). The lifted code is x86 arithmetic written in C:
+    # a signed add that overflows must wrap as the CPU's does (-fwrapv), and
+    # guest memory is read through whatever pointer type the instruction
+    # implies (-fno-strict-aliasing). Without them the optimiser is entitled
+    # to delete overflow checks and reorder loads, and does.
+    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing -w)
+    # Export every function, so the fault handler's SymFromAddr (dladdr)
+    # names the generated sub_XXXXXXXX a host address is in.
+    set_target_properties(${PROJECT_NAME} PROPERTIES ENABLE_EXPORTS ON)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _GNU_SOURCE)
+endif()
 
 # MSVC-specific: large address aware, increase section limit for big generated files
 if(MSVC)

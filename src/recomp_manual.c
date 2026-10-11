@@ -19,6 +19,7 @@
  */
 
 #include <stdio.h>
+#include <stddef.h>   /* ptrdiff_t */
 #include <stdint.h>
 #include <stdlib.h>   /* getenv, exit: the spin verdict below */
 #include <string.h>   /* strcmp: RECOMP_ICALL_FATAL */

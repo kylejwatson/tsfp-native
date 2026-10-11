@@ -33,6 +33,11 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include <stdio.h>
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -95,6 +100,7 @@ extern ptrdiff_t g_xbox_mem_offset;
  * the generated headers, which this file does not include. */
 void recomp_profile_dump(void);
 void recomp_exit_trace_init(void);      /* src/kernel/exit_trace.c */
+int  recomp_dispatch_init(void);         /* generated: recomp_dispatch.c */
 
 /* Defined in kernel_bridge.c: the APU is a separate library the kernel must
  * not need to link, so the kernel takes its interrupt line as a callback. */
@@ -117,13 +123,33 @@ static BOOL load_xbe(const char *path, void **out_data, size_t *out_size);
  * of the game files.
  * ============================================================ */
 
-static char g_game_dir[MAX_PATH];
-static char g_xbe_path[MAX_PATH];
+/* The directory separator; Windows accepts '/' too, so the defaults below
+ * may use either. */
+#if defined(_WIN32)
+#define PATH_SEP "\\"
+#else
+#define PATH_SEP "/"
+#endif
+
+static char g_game_dir[1024];
+static char g_xbe_path[1024];
 
 static BOOL file_exists(const char *path)
 {
+#if defined(_WIN32)
     DWORD a = GetFileAttributesA(path);
     return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
+#else
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+#endif
+}
+
+/* The last directory separator in a path, either kind. */
+static char *last_separator(char *path)
+{
+    char *a = strrchr(path, '\\'), *b = strrchr(path, '/');
+    return a > b ? a : b;
 }
 
 /* Fills g_game_dir and g_xbe_path, or returns FALSE having left a message in
@@ -131,7 +157,7 @@ static BOOL file_exists(const char *path)
  * thing to tell somebody whose game files are somewhere else. */
 static BOOL find_game(char *tried, size_t tried_bytes)
 {
-    char exe[MAX_PATH], dir[MAX_PATH], candidate[MAX_PATH];
+    char exe[1024], dir[1024], candidate[1024];
     const char *env = getenv("RECOMP_GAME_DIR");
     char *slash;
     int i;
@@ -139,7 +165,7 @@ static BOOL find_game(char *tried, size_t tried_bytes)
     tried[0] = '\0';
     if (env && *env) {
         snprintf(g_game_dir, sizeof g_game_dir, "%s", env);
-        snprintf(g_xbe_path, sizeof g_xbe_path, "%s\\default.xbe", env);
+        snprintf(g_xbe_path, sizeof g_xbe_path, "%s" PATH_SEP "default.xbe", env);
         if (file_exists(g_xbe_path))
             return TRUE;
         snprintf(tried, tried_bytes, "RECOMP_GAME_DIR: %s", g_xbe_path);
@@ -149,16 +175,16 @@ static BOOL find_game(char *tried, size_t tried_bytes)
     if (!GetModuleFileNameA(NULL, exe, (DWORD)sizeof exe))
         return FALSE;
     snprintf(dir, sizeof dir, "%s", exe);
-    slash = strrchr(dir, '\\');
+    slash = last_separator(dir);
     if (slash)
         *slash = '\0';
 
     for (i = 0; i < 2; i++) {
         if (i == 0)
-            snprintf(candidate, sizeof candidate, "%s\\game", dir);
+            snprintf(candidate, sizeof candidate, "%s" PATH_SEP "game", dir);
         else
-            snprintf(candidate, sizeof candidate, "%s\\%s", dir, YOUR_GAME_DIR);
-        snprintf(g_xbe_path, sizeof g_xbe_path, "%s\\default.xbe", candidate);
+            snprintf(candidate, sizeof candidate, "%s" PATH_SEP "%s", dir, YOUR_GAME_DIR);
+        snprintf(g_xbe_path, sizeof g_xbe_path, "%s" PATH_SEP "default.xbe", candidate);
         if (file_exists(g_xbe_path)) {
             snprintf(g_game_dir, sizeof g_game_dir, "%s", candidate);
             return TRUE;
@@ -388,11 +414,32 @@ static LONG CALLBACK veh_handler(PEXCEPTION_POINTERS ep)
          * "[i] 0x..." are kept as they were for anything that parses them. */
         {
             uintptr_t *sp = (uintptr_t *)ep->ContextRecord->Rsp;
+#if defined(_WIN32)
             HMODULE mod = GetModuleHandleW(NULL);
             const IMAGE_NT_HEADERS *nt = (const IMAGE_NT_HEADERS *)
                 ((const BYTE *)mod + ((const IMAGE_DOS_HEADER *)mod)->e_lfanew);
             uintptr_t lo = (uintptr_t)mod;
             uintptr_t hi = lo + nt->OptionalHeader.SizeOfImage;
+#else
+            /* The executable's own text: from its base to the end of the
+             * mapping /proc/self/maps lists for it. */
+            Dl_info self;
+            uintptr_t lo = 0, hi = 0;
+            if (dladdr((void *)&veh_handler, &self) && self.dli_fbase) {
+                FILE *maps = fopen("/proc/self/maps", "r");
+                char line[512];
+                lo = (uintptr_t)self.dli_fbase;
+                hi = lo;
+                while (maps && fgets(line, sizeof line, maps)) {
+                    unsigned long a, b;
+                    if (sscanf(line, "%lx-%lx", &a, &b) == 2 && a >= lo && a <= hi + 0x10000000ul &&
+                        strstr(line, self.dli_fname ? self.dli_fname : "\x01"))
+                        hi = b;
+                }
+                if (maps)
+                    fclose(maps);
+            }
+#endif
             int shown = 0;
             fprintf(stderr, "  Native stack (first 8 return addrs):\n");
             for (int i = 0; i < 256 && shown < 12; i++) {
@@ -442,8 +489,9 @@ static LONG CALLBACK veh_handler(PEXCEPTION_POINTERS ep)
  * "it did not start" is not a bug report, and the file is.
  * ============================================================ */
 
-static char g_log_path[MAX_PATH];
+static char g_log_path[1024];
 
+#if defined(_WIN32)
 static BOOL handle_is_real(DWORD which)
 {
     HANDLE h = GetStdHandle(which);
@@ -453,12 +501,15 @@ static BOOL handle_is_real(DWORD which)
     return GetFileType(h) != FILE_TYPE_UNKNOWN;
 }
 
+#endif
+
 static void setup_output(void)
 {
-    char exe[MAX_PATH];
+    char exe[1024];
     char *dot;
     FILE *f;
 
+#if defined(_WIN32)
     if (handle_is_real(STD_OUTPUT_HANDLE) || handle_is_real(STD_ERROR_HANDLE))
         return;                                  /* redirected: leave it */
 
@@ -467,12 +518,23 @@ static void setup_output(void)
         freopen("CONOUT$", "w", stderr);
         return;
     }
+#else
+    /* A terminal, a file or a pipe: leave it. Started from a desktop
+     * launcher, stderr is /dev/null or a socket to the session log, and the
+     * log beside the executable is worth more than either. */
+    {
+        struct stat st;
+        if (isatty(STDERR_FILENO) ||
+            (fstat(STDERR_FILENO, &st) == 0 && (S_ISREG(st.st_mode) || S_ISFIFO(st.st_mode))))
+            return;
+    }
+#endif
 
     if (!GetModuleFileNameA(NULL, exe, (DWORD)sizeof exe))
         return;
     snprintf(g_log_path, sizeof g_log_path, "%s", exe);
     dot = strrchr(g_log_path, '.');
-    if (dot && !strchr(dot, '\\'))
+    if (dot && !strchr(dot, '\\') && !strchr(dot, '/'))
         *dot = '\0';
     strncat(g_log_path, ".log", sizeof g_log_path - strlen(g_log_path) - 1);
 
@@ -493,16 +555,10 @@ static void log_hint(char *buf, size_t bytes)
         snprintf(buf + n, bytes - n, "\n\nThere is more in:\n%s", g_log_path);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-                   LPSTR lpCmdLine, int nCmdShow)
+static int run_game(void)
 {
     void *xbe_data = NULL;
     size_t xbe_size = 0;
-
-    (void)hInstance;
-    (void)hPrevInstance;
-    (void)lpCmdLine;
-    (void)nCmdShow;
 
     /* Before anything prints: a windowed program has nowhere to print
      * unless this says where. */
@@ -540,7 +596,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
             snprintf(message, sizeof message,
                      "This needs the game's own files, which are not included.\n\n"
                      "Put them in a folder called \"game\" next to this program, so that\n"
-                     "\"game\\default.xbe\" exists, or set RECOMP_GAME_DIR to where they are.\n\n"
+                     "\"game" PATH_SEP "default.xbe\" exists, or set RECOMP_GAME_DIR to where they are.\n\n"
                      "Looked for:\n%s", tried);
             fprintf(stderr, "%s\n", message);
             log_hint(message, sizeof message);
@@ -722,6 +778,17 @@ static BOOL load_xbe(const char *path, void **out_data, size_t *out_size)
     return TRUE;
 }
 
+#if defined(_WIN32)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                   LPSTR lpCmdLine, int nCmdShow)
+{
+    (void)hInstance;
+    (void)hPrevInstance;
+    (void)lpCmdLine;
+    (void)nCmdShow;
+    return run_game();
+}
+
 /* Console entry point (for debugging -- lets you see printf output) */
 int main(int argc, char **argv)
 {
@@ -729,3 +796,11 @@ int main(int argc, char **argv)
     (void)argv;
     return WinMain(GetModuleHandle(NULL), NULL, GetCommandLineA(), SW_SHOW);
 }
+#else
+int main(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    return run_game();
+}
+#endif

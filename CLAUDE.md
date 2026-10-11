@@ -19,7 +19,8 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 
 ## Build / lift / run
 
-- Build: `cmd.exe //c "C:\Users\mail\Documents\mygame\build_vs.bat"` (the bare name stopped resolving from Git Bash) (VS 2026 "18" + Ninja; writes `build/futureperfect_recomp.exe`). ~10 min full, seconds incremental. Builds are long: run in background and poll `tasklist` for ninja/cl.
+- **Linux** (this machine is now CachyOS; same checkout): `./build.sh` -> `build-linux/futureperfect_recomp` (clang + Ninja, ~30 s full build of the lifted code). `./play.sh [route]`, `./record.sh <name>`, `./run_seq.sh` and `./relift.sh` (python3) all work. See "Linux port" below.
+- Build (Windows): `cmd.exe //c "C:\Users\mail\Documents\mygame\build_vs.bat"` (the bare name stopped resolving from Git Bash) (VS 2026 "18" + Ninja; writes `build/futureperfect_recomp.exe`). ~10 min full, seconds incremental. Builds are long: run in background and poll `tasklist` for ninja/cl.
 - Re-lift: `./relift.sh` (from disasm; needed after seed changes). `FROM=lift ./relift.sh` after adding/removing an `HLE_EXPORT` in `xboxrecomp/src/hle` or a function in `recomp_manual.c`.
 - The exe finds the game at `..\game_files` relative to itself (or `RECOMP_GAME_DIR`).
 - Scripted test run with frame dumps + contact sheet: `./run_seq.sh <name> "<RECOMP_INPUT_SEQ>" <seconds> [dump_every]` → `runs/<name>/montage.png`, log `runs/<name>.log` (`runs/` is ignored; put captures in `caps*/`, replays in `rep*/`, also ignored). `MINDRAWS=n` and `EXTRA="ENV=1 ..."` are honoured. Always muted.
@@ -83,6 +84,14 @@ Replay tool additions: `--list-draws` prints fog states, raw vertex dwords and r
 27. Uplink start-up shimmer (blue square, then a square instead of a circle, map back in the corner): combiner gaps in `d3d8_combiners.c` -- the final combiner has its own constants (Xbox render states 43/44 -> host `D3DRS_PSFINALCOMBINERCONSTANT0/1`, emitted as `fc0`/`fc1`), stages share stage 0's C0/C1 unless `PS_COMBINERCOUNT` has UNIQUE_C0 (0x10<<8) / UNIQUE_C1 (0x100<<8), `AB/CD_BLUE_TO_ALPHA` output flags are implemented, and a stage's RGB writes land after the alpha portion reads its inputs. Plus a frame-buffer texture is re-copied whenever the frame buffer was drawn into since its last copy, not once a frame (`RECOMP_HLE_D3D8_FB_COPY_ONCE=1` for the old way): the shimmer's first bind was mid-way through building the corner, and the full-screen passes after the world sampled that.
 
 
+## Linux port (Oct 2026)
+
+Same sources, native x86-64 Linux build; the Windows build is unchanged in behaviour (verify on Windows after pulling: the shared files below were edited).
+- **Renderer**: `src/d3d` is unchanged; on Linux the 61 D3D11 entry points it calls are implemented on Vulkan 1.3 in `xboxrecomp/src/d3d/vk/d3d11_vk.c` (dynamic rendering, all app images in GENERAL, full barrier between passes/transfers, per-frame upload arena for DYNAMIC Map(DISCARD), pipelines cached on the whole state + `~/.cache/xboxrecomp/vk_pipeline_cache.bin`). `vk/include/` supplies `<d3d11.h>/<dxgi.h>/<d3dcompiler.h>`. `D3DCompile` = shaderc (glslang HLSL), SPIR-V cached in `~/.cache/xboxrecomp/spirv`; VS inputs and PS inputs are linked by HLSL semantic (UserSemantic decorations, then stripped). Y flip = negative viewport; **no** front-face inversion (the toolkit doc's 4.4 was wrong: the negative viewport keeps D3D's on-screen winding; level 1 culls correctly). F9 overlay text via FreeType/fontconfig. `RECOMP_VK_VALIDATION=1`, `RECOMP_VK_LOG=1`, `RECOMP_VK_DEVICE=n`.
+- **Platform** (`src/platform`): real `CONTEXT` + vectored exception handlers on sigaction (MMIO traps, watchpoints, fault reports all work), `host_sdl.c` (SDL window + event thread; backs `GetAsyncKeyState`, `GetForegroundWindow`, `GetClientRect`, `XInputGetState` via SDL GameController), SymFromAddr via dladdr (exe built with ENABLE_EXPORTS), futex `WaitOnAddress`, `posix_include/windows.h`. Audio: `src/hle/audio_output_sdl.c` (mixer with XAudio2's play-position contract). Mouse: SDL relative mode.
+- **Bugs the port exposed** (real on both OSes): (1) `xbox_HeapAlloc`/`xbox_ContiguousAlloc` had no lock and two start-up guest threads raced (Linux: the title's 1 MB heap landed on live blocks -> fault at 0xFFFFFFF8); now one SRW lock. (2) clang fuses volatile `|=` into `or [mem], imm`, which no trap decoder knew (MSVC emits load/or/mov); `platform/mmio_decode.h` now decodes every RMW form (ALU r/imm, INC/DEC/NOT/NEG, XCHG/XADD/CMPXCHG, LOCK) and the APU, NV2A-interrupt and AC'97 handlers all go through it. (3) The POSIX file/path layer had fallen behind Windows: partition-device images (`Partition0..5.img` in `~/.local/share/xboxrecomp`), device-as-directory opens, FILE_CREATE collisions, root-relative opens, positioned pread/pwrite, plus case-insensitive path resolution (the disc has `UDATA` but `pak/`).
+- Not ported: the RECOMP_SAMPLE profiler and exit tracing (use perf/gdb), XMV movies (as on Windows without ffmpeg), MSAA.
+
 ## Open issues (next steps)
 
 - Mission 3 opening cutscene: characters sometimes take a second to appear, and ones that should leave with a shimmer sometimes vanish at once. **The user sees the same in xemu**, so it is probably not a recompilation bug (an original-game quirk or something both share, e.g. timing/streaming); to be looked at in its own session.
@@ -95,7 +104,7 @@ Inputs for the challenge: `14000:a,17000:down+a,21000:down,22000:down,23500:a,27
 
 ## Gotchas
 
-- Many toolkit sources are CRLF; edit with the Edit tool or preserve line endings. Python heredocs writing C with `\n` inside string literals have turned into real newlines here — check with `cat -A` after scripted edits.
+- Line endings: both repos store LF and `.gitattributes` forces LF checkouts everywhere (`.bat`/`.cmd`/`.ps1` CRLF); `.editorconfig` matches. Python heredocs writing C with `\n` inside string literals have turned into real newlines here — check with `cat -A` after scripted edits.
 - `rm -rf` of directories is blocked by the harness; leave scratch dirs (they're gitignored).
 - Scripted runs create/modify saves in `game_files/UDATA/45410066` (a throwaway "bbbb…" profile exists).
 - A Claude shell sees a `%APPDATA%\xboxrecomp\input_bindings.json` (stale) that the user's real profile doesn't have, and it wins over the one beside the exe: test runs that depend on the bindings need `RECOMP_INPUT_CONFIG=<repo>/build/input_bindings.json`.
