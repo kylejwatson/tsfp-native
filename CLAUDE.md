@@ -76,11 +76,13 @@ toolkit's own context (architecture, debug table, env switches) and is not repea
 
 Replay tool additions: `--list-draws` prints fog states, raw vertex dwords and recorded vertex data; `REPLAY_ALL_CONSTANTS=1`, `REPLAY_TEX_DUMP=<id>` (writes `tex_<id>.bin`), `REPLAY_NO_CULL=1`, `REPLAY_NO_Z=1`; `RECOMP_D3D8_PS_SHOW=fograw`. `RECOMP_HLE_D3D8_ARRAY_CHECK=1` compares declarations with NV2A arrays (they agreed in level 1). `RECOMP_HLE_D3D8_ARRAY_TRACE=<stride>|1` (+ `_AFTER=<ms>`) prints declaration vs hardware arrays per draw. Replay: `--list-draws` shows each draw's program hash (`prog`, matches `RECOMP_D3D8_VS_DUMP=1` output), `REPLAY_SHOW_CONSTANTS=<first>[,<n>]`, `--skip-draw a-b`. Push dump reports hardware draw count (it matched intercepted draws).
 
+24. Shimmering (cloaked) creatures darken the screen (user): fixed by 17, verified.
+
+
 ## Open issues (next steps)
 
 - Mission 3 opening cutscene: characters sometimes take a second to appear, and ones that should leave with a shimmer sometimes vanish at once. **The user sees the same in xemu**, so it is probably not a recompilation bug (an original-game quirk or something both share, e.g. timing/streaming); to be looked at in its own session.
 - Re-check by ear after fix 16: cutscene lip-sync and the "I think we found it…" dialogue.
-- Shimmering (cloaked) creatures darken the screen (user): expected fixed by 17, unverified.
 - Stray triangles at a marine's shoulders in level 1 (seen once, before fix 15); bright rectangle in the first fade-in frame of level 1 (fix 14 side effect).
 - XMV movies are skipped (toolkit built without `third_party/ffmpeg`).
 - PS5 controller: XInput only; needs Steam Input/DS4Windows, or a HID backend in `src/input`.
