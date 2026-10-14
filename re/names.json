@@ -2656,6 +2656,253 @@
      "notes": "Turn Speed slider; the look is scaled by turn_speed + 0.5"
     }
    ]
+  },
+  {
+   "name": "MenuContext",
+   "size": "0x1E0",
+   "notes": "g_menu_contexts[MenuWindow.context]: the state one menu context (a player's set of windows) shares, including the cursor of cursor mode.",
+   "source": "menu mouse study (2026-10-14)",
+   "fields": [
+    {
+     "off": "0x00",
+     "name": "flags",
+     "type": "uint",
+     "notes": "bit 1: the cursor was clamped by menu_cursor_place"
+    },
+    {
+     "off": "0x0C",
+     "name": "top",
+     "type": "MenuWindow *",
+     "notes": "the context's top window (menu focus follows it, 0x77470)"
+    },
+    {
+     "off": "0x10",
+     "name": "cursor_mode",
+     "type": "int",
+     "notes": "1: cursor mode (menu_cursor_on); the left stick moves the cursor and items are picked by it"
+    },
+    {
+     "off": "0x18",
+     "name": "cursor_x",
+     "type": "float",
+     "notes": "normalised: screen = x0 + cursor_x * (x1 - x0) * 0.01"
+    },
+    {
+     "off": "0x1C",
+     "name": "cursor_y",
+     "type": "float"
+    },
+    {
+     "off": "0x20",
+     "name": "cursor_sx",
+     "type": "float",
+     "notes": "on screen, the units item rects use (menu_cursor_place)"
+    },
+    {
+     "off": "0x24",
+     "name": "cursor_sy",
+     "type": "float"
+    },
+    {
+     "off": "0x48",
+     "name": "cursor_min_x",
+     "type": "float",
+     "notes": "cursor bounds on screen"
+    },
+    {
+     "off": "0x4C",
+     "name": "cursor_min_y",
+     "type": "float"
+    },
+    {
+     "off": "0x50",
+     "name": "cursor_max_x",
+     "type": "float"
+    },
+    {
+     "off": "0x54",
+     "name": "cursor_max_y",
+     "type": "float"
+    },
+    {
+     "off": "0x68",
+     "name": "x0",
+     "type": "float",
+     "notes": "the context's screen rectangle (0x80EA0 makes the scale from it)"
+    },
+    {
+     "off": "0x6C",
+     "name": "y0",
+     "type": "float"
+    },
+    {
+     "off": "0x70",
+     "name": "x1",
+     "type": "float"
+    },
+    {
+     "off": "0x74",
+     "name": "y1",
+     "type": "float"
+    },
+    {
+     "off": "0xF4",
+     "name": "cursor_draw",
+     "type": "void *",
+     "notes": "drawn by menu_draw_window_late in cursor mode when set"
+    }
+   ]
+  },
+  {
+   "name": "MenuItem",
+   "notes": "One row of a menu window (MenuWindow.items, linked by next).",
+   "source": "menu mouse study (2026-10-14)",
+   "fields": [
+    {
+     "off": "0x04",
+     "name": "next",
+     "type": "MenuItem *"
+    },
+    {
+     "off": "0x28",
+     "name": "flags",
+     "type": "uint",
+     "notes": "bit 2: disabled (skipped by navigation and the cursor), bit 0: no action"
+    },
+    {
+     "off": "0x38",
+     "name": "on_accept",
+     "type": "void *",
+     "notes": "called with the window when A is pressed on the item"
+    },
+    {
+     "off": "0x78",
+     "name": "sx0",
+     "type": "float",
+     "notes": "screen rectangle, the cursor's units"
+    },
+    {
+     "off": "0x7C",
+     "name": "sy0",
+     "type": "float"
+    },
+    {
+     "off": "0x80",
+     "name": "sx1",
+     "type": "float"
+    },
+    {
+     "off": "0x84",
+     "name": "sy1",
+     "type": "float"
+    },
+    {
+     "off": "0xB4",
+     "name": "kind",
+     "type": "int",
+     "notes": "0 button, 1 value list (left/right only off cursor mode), 2, 4, 5/6 (clickable value/arrows, menu_click_option)"
+    },
+    {
+     "off": "0xC4",
+     "name": "choice_count",
+     "type": "int"
+    },
+    {
+     "off": "0xC8",
+     "name": "choice",
+     "type": "int",
+     "notes": "the value shown"
+    },
+    {
+     "off": "0xD8",
+     "name": "choices",
+     "type": "void *",
+     "notes": "0x14 bytes each"
+    }
+   ]
+  },
+  {
+   "name": "MenuWindow",
+   "notes": "A menu screen or panel: items, child windows, per-frame button bits.",
+   "source": "menu mouse study (2026-10-14)",
+   "fields": [
+    {
+     "off": "0x0C",
+     "name": "on_update",
+     "type": "void *"
+    },
+    {
+     "off": "0x10",
+     "name": "on_draw",
+     "type": "void *"
+    },
+    {
+     "off": "0x1C",
+     "name": "style",
+     "type": "void *",
+     "notes": "callbacks and timings shared by a kind of window"
+    },
+    {
+     "off": "0x2C",
+     "name": "parent",
+     "type": "MenuWindow *"
+    },
+    {
+     "off": "0x38",
+     "name": "context",
+     "type": "int",
+     "notes": "index into g_menu_contexts"
+    },
+    {
+     "off": "0x3C",
+     "name": "players",
+     "type": "uint",
+     "notes": "bit per player whose pad drives it"
+    },
+    {
+     "off": "0x40",
+     "name": "flags",
+     "type": "uint",
+     "notes": "0x40000: ignores cursor mode"
+    },
+    {
+     "off": "0xC4",
+     "name": "pressed",
+     "type": "uint",
+     "notes": "menu button bits this frame (menu_read_pads): bit n | bit n+16 when it went down; 0x10 A, 0x20 B, 0x10000/0x20000 up/down, 0x40000/0x80000 left/right"
+    },
+    {
+     "off": "0xC8",
+     "name": "held",
+     "type": "uint"
+    },
+    {
+     "off": "0x16C",
+     "name": "children",
+     "type": "MenuWindow *",
+     "notes": "linked by +0x30"
+    },
+    {
+     "off": "0x178",
+     "name": "items",
+     "type": "MenuItem *"
+    },
+    {
+     "off": "0x198",
+     "name": "focus",
+     "type": "MenuItem *"
+    },
+    {
+     "off": "0x1BC",
+     "name": "on_accept",
+     "type": "void *"
+    },
+    {
+     "off": "0x1C0",
+     "name": "on_back",
+     "type": "void *"
+    }
+   ]
   }
  ]
 }

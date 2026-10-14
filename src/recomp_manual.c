@@ -24,6 +24,7 @@
 #include <stdlib.h>   /* getenv, exit: the spin verdict below */
 #include <string.h>   /* strcmp: RECOMP_ICALL_FATAL */
 #include <math.h>     /* floorf, fabsf: mounted-gun angle limits */
+#include <time.h>     /* timespec_get: menus with the mouse */
 
 /* One diagnostic report, one piece.
  *
@@ -267,6 +268,9 @@ static void tsfp_mouse_look_mounted(uint32_t state, uint32_t mount,
  * poll. */
 extern void sub_00042870_gen(void);
 extern void sub_000438B0_gen(void);
+static double tsfp_now(void);         /* menus with the mouse, below */
+static double s_menu_seen;
+static int s_menu_trace = -1;
 static uint32_t s_pads_neutral;
 
 void sub_00042870(void)
@@ -282,6 +286,298 @@ void sub_000438B0(void)
 {
     sub_000438B0_gen();
     s_pads_neutral = 0;
+    /* No menu of player 1's has read its pads for a while: the mouse is for
+     * looking again (tsfp_menu_mouse). */
+    if (recomp_mouse_pointer_mode() && tsfp_now() - s_menu_seen > 0.25) {
+        recomp_mouse_set_pointer_mode(0);
+        if (s_menu_trace > 0)
+            fprintf(stderr, "[MENU] pointer mode off\n");
+    }
+}
+
+/* ── Menus with the mouse ─────────────────────────────────────
+ *
+ * FP's menu system has a cursor mode of its own (MenuContext.cursor_mode,
+ * menu_cursor_on), which only MapMaker turns on: the left stick moves a
+ * cursor, the item under it takes the focus (menu_cursor_update, with the
+ * focus sound), and A acts on the focused item; value rows of kind 5/6 take
+ * a click on their arrows (menu_click_option). Player 1's menus use it for
+ * the mouse:
+ *
+ *   - While one of them reads its pads (menu_read_pads), the host is in
+ *     pointer mode (recomp_mouse_set_pointer_mode): the cursor is the
+ *     system's own, free and visible, and the buttons are the menu's.
+ *     pads_update turns pointer mode off again once no menu has read its
+ *     pads for a moment, and the mouse is captured for look as before.
+ *   - Moving or clicking the mouse puts the context in cursor mode and the
+ *     pointer becomes its cursor; a pad or keyboard press or a deflected
+ *     stick takes cursor mode away again, so up/down and left/right work as
+ *     they always did. Only cursor modes turned on here are turned off.
+ *   - Left click over an item is A. Value rows of kind 1 (left/right on the
+ *     pad, and nothing at all in cursor mode) step back when the click is
+ *     left of the middle of their value and forward otherwise. Right click
+ *     is B anywhere.
+ *
+ * The cursor is measured in the guest's screen units: FP draws its menus on
+ * a 640x480 screen, widescreen or not (the 16:9 picture is that screen
+ * stretched), so a point on the picture is that fraction of 640x480.
+ * RECOMP_MENU_TRACE=1 logs the context, the pointer and every click. */
+extern void sub_00073870_gen(void);
+extern void sub_000756A0(void);         /* menu_option_prev */
+extern void sub_000755D0(void);         /* menu_option_next */
+
+#define TSFP_SCREEN_W 640.0f
+#define TSFP_SCREEN_H 480.0f
+#define TSFP_MENU_A    (0x10u | 0x100000u)   /* MenuWindow.pressed: A went down */
+#define TSFP_MENU_B    (0x20u | 0x200000u)
+#define TSFP_MENU_LEFT  (0x04u | 0x40000u)
+#define TSFP_MENU_RIGHT (0x08u | 0x80000u)
+
+static int s_menu_cursor;               /* the mouse is driving player 1's menus */
+static uint32_t s_cursor_ours;          /* contexts whose cursor mode is ours */
+
+static double tsfp_now(void)
+{
+    struct timespec ts;
+
+    timespec_get(&ts, TIME_UTC);
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+
+/* Calls a lifted cdecl function with its arguments on the guest stack.
+ * The callee pops the return address with its ret; the caller pops the rest. */
+static uint32_t tsfp_guest_call(void (*fn)(void), int n, const uint32_t *args)
+{
+    int i;
+
+    for (i = n - 1; i >= 0; i--) {
+        g_esp -= 4;
+        GUEST_U32(g_esp) = args[i];
+    }
+    g_esp -= 4;
+    GUEST_U32(g_esp) = 0;               /* return address */
+    fn();
+    g_esp += 4u * (uint32_t)n;
+    return g_eax;
+}
+
+/* The enabled item whose screen rectangle holds (sx, sy), or 0. */
+static uint32_t tsfp_menu_item_at(uint32_t w, float sx, float sy)
+{
+    uint32_t it = GUEST_U32(w + TSFP_MENUWINDOW_ITEMS);
+    int n;
+
+    for (n = 0; it && n < 1024; it = GUEST_U32(it + TSFP_MENUITEM_NEXT), n++) {
+        if (GUEST_U32(it + TSFP_MENUITEM_FLAGS) & 4)
+            continue;
+        if (sx >= GUEST_F32(it + TSFP_MENUITEM_SX0) && sx < GUEST_F32(it + TSFP_MENUITEM_SX1) &&
+            sy >= GUEST_F32(it + TSFP_MENUITEM_SY0) && sy < GUEST_F32(it + TSFP_MENUITEM_SY1))
+            return it;
+    }
+    return 0;
+}
+
+/* Where the arrows of value rows were last drawn. The game draws a kind 1
+ * row's value with an arrow either side (0x7B7B0, the item in EAX): the
+ * left one by 0x81B20, the right one by 0x81AD0, each (x0, y0, x1, y1,
+ * colour) in screen units, just outside a value text of the font's width.
+ * Taking them from the drawing is simpler than measuring the text. */
+#define TSFP_ARROW_ROWS 64
+static struct { uint32_t item; float left[4], right[4]; int have; } s_arrows[TSFP_ARROW_ROWS];
+static uint32_t s_arrow_item;           /* the row 0x7B7B0 is drawing, or 0 */
+static int s_arrow_next;
+
+extern void sub_0007B7B0_gen(void);
+extern void sub_00081AD0_gen(void);
+extern void sub_00081B20_gen(void);
+
+static int tsfp_arrow_slot(uint32_t item, int make)
+{
+    int i;
+
+    for (i = 0; i < TSFP_ARROW_ROWS; i++)
+        if (s_arrows[i].item == item)
+            return i;
+    if (!make)
+        return -1;
+    i = s_arrow_next;
+    s_arrow_next = (s_arrow_next + 1) % TSFP_ARROW_ROWS;
+    s_arrows[i].item = item;
+    s_arrows[i].have = 0;
+    return i;
+}
+
+static void tsfp_arrow_record(int right)
+{
+    int i = tsfp_arrow_slot(s_arrow_item, 1), k;
+    float *r = right ? s_arrows[i].right : s_arrows[i].left;
+
+    for (k = 0; k < 4; k++)
+        r[k] = GUEST_F32(g_esp + 4 + 4u * (uint32_t)k);
+    s_arrows[i].have |= right ? 2 : 1;
+}
+
+void sub_0007B7B0(void)
+{
+    s_arrow_item = g_eax;               /* (window, rect), the item in EAX */
+    sub_0007B7B0_gen();
+    s_arrow_item = 0;
+}
+
+void sub_00081AD0(void)
+{
+    if (s_arrow_item)
+        tsfp_arrow_record(1);
+    sub_00081AD0_gen();
+}
+
+void sub_00081B20(void)
+{
+    if (s_arrow_item)
+        tsfp_arrow_record(0);
+    sub_00081B20_gen();
+}
+
+/* A click on a value row of kind 1: back when it is nearer the left arrow
+ * (from a little before it up to half way to the right one), forward
+ * anywhere else on the row, the label included. */
+static void tsfp_menu_step_value(uint32_t it, float sx)
+{
+    int i = tsfp_arrow_slot(it, 0), back = 0;
+
+    if (i >= 0 && s_arrows[i].have == 3) {
+        float l0 = s_arrows[i].left[0], mid = (s_arrows[i].left[2] + s_arrows[i].right[0]) * 0.5f;
+        back = sx >= l0 - (s_arrows[i].left[2] - l0) && sx < mid;
+    }
+    if (s_menu_trace)
+        fprintf(stderr, "[MENU] value row 0x%08X choice %u/%u arrows %s%.1f-%.1f %.1f-%.1f: %s\n",
+                it, GUEST_U32(it + TSFP_MENUITEM_CHOICE), GUEST_U32(it + TSFP_MENUITEM_CHOICE_COUNT),
+                i >= 0 && s_arrows[i].have == 3 ? "" : "(none) ",
+                i >= 0 ? s_arrows[i].left[0] : 0.0f, i >= 0 ? s_arrows[i].left[2] : 0.0f,
+                i >= 0 ? s_arrows[i].right[0] : 0.0f, i >= 0 ? s_arrows[i].right[2] : 0.0f,
+                back ? "back" : "forward");
+    tsfp_guest_call(back ? sub_000756A0 : sub_000755D0, 1, &it);
+}
+
+/* The player's pad or keyboard was used this frame: a press, or a stick
+ * pushed past half way. */
+static int tsfp_pad_used(int player)
+{
+    uint32_t port = GUEST_U32(TSFP_G_PLAYER_PORT + 4u * (uint32_t)player), pad;
+    int lx, ly;
+
+    if (port >= 4)
+        return 0;
+    pad = TSFP_G_PADS + port * TSFP_PADSTATE_SIZE;
+    if (GUEST_U32(pad + TSFP_PADSTATE_PRESSED))
+        return 1;
+    lx = (int)GUEST_U32(pad + TSFP_PADSTATE_LX) - 0x80;
+    ly = (int)GUEST_U32(pad + TSFP_PADSTATE_LY) - 0x80;
+    return lx > 0x40 || lx < -0x40 || ly > 0x40 || ly < -0x40;
+}
+
+static void tsfp_menu_mouse(uint32_t w)
+{
+    uint32_t ctx = GUEST_U32(w + TSFP_MENUWINDOW_CONTEXT), c, bit, it = 0;
+    long clicks, held = 0;
+    int wheel = 0, moved, over;
+    float px, py, sx, sy, x0, y0, scale_x, scale_y;
+
+    if (!(GUEST_U32(w + TSFP_MENUWINDOW_PLAYERS) & 1u) || ctx >= 32)
+        return;                         /* not player 1's */
+    if (s_menu_trace < 0) {
+        const char *e = getenv("RECOMP_MENU_TRACE");
+        s_menu_trace = e ? atoi(e) : 0;
+    }
+    s_menu_seen = tsfp_now();
+    if (!recomp_mouse_pointer_mode()) {
+        recomp_mouse_set_pointer_mode(1);
+        if (s_menu_trace)
+            fprintf(stderr, "[MENU] pointer mode on (window 0x%08X)\n", w);
+    }
+    if (GUEST_U32(w + TSFP_MENUWINDOW_FLAGS) & 0x40000u)
+        return;                         /* keeps the pad's navigation */
+
+    c = TSFP_G_MENU_CONTEXTS + ctx * TSFP_MENUCONTEXT_SIZE;
+    bit = 1u << ctx;
+    moved = recomp_mouse_pointer_take_moves() != 0;
+    clicks = recomp_mouse_pointer_take_clicks(&held, &wheel);
+    if (tsfp_pad_used(0))
+        s_menu_cursor = 0;
+    if (moved || clicks)
+        s_menu_cursor = 1;
+    if (!s_menu_cursor) {
+        if (s_cursor_ours & bit) {
+            GUEST_U32(c + TSFP_MENUCONTEXT_CURSOR_MODE) = 0;
+            s_cursor_ours &= ~bit;
+        }
+        return;
+    }
+    if (!GUEST_U32(c + TSFP_MENUCONTEXT_CURSOR_MODE)) {
+        GUEST_U32(c + TSFP_MENUCONTEXT_CURSOR_MODE) = 1;
+        s_cursor_ours |= bit;
+    }
+
+    over = recomp_mouse_pointer(&px, &py);
+    sx = px * TSFP_SCREEN_W;
+    sy = py * TSFP_SCREEN_H;
+    /* menu_cursor_place's mapping, backwards: screen = x0 + n * scale. */
+    x0 = GUEST_F32(c + TSFP_MENUCONTEXT_X0);
+    y0 = GUEST_F32(c + TSFP_MENUCONTEXT_Y0);
+    scale_x = (GUEST_F32(c + TSFP_MENUCONTEXT_X1) - x0) * GUEST_F32(0x00475D1Cu);
+    scale_y = (GUEST_F32(c + TSFP_MENUCONTEXT_Y1) - y0) * GUEST_F32(0x00475D1Cu);
+    GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_SX) = sx;
+    GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_SY) = sy;
+    if (scale_x != 0.0f && scale_y != 0.0f) {
+        GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_X) = (sx - x0) / scale_x;
+        GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_Y) = (sy - y0) / scale_y;
+    }
+
+    if (clicks && s_menu_trace > 1) {    /* RECOMP_MENU_TRACE=2: the window's items */
+        uint32_t i = GUEST_U32(w + TSFP_MENUWINDOW_ITEMS);
+        int n;
+        for (n = 0; i && n < 64; i = GUEST_U32(i + TSFP_MENUITEM_NEXT), n++)
+            fprintf(stderr, "[MENU]   item 0x%08X kind %u accept 0x%X b8 0x%X flags 0x%X rect %.1f,%.1f-%.1f,%.1f choice %u/%u\n",
+                    i, GUEST_U32(i + TSFP_MENUITEM_KIND), GUEST_U32(i + TSFP_MENUITEM_ON_ACCEPT), GUEST_U32(i + 0xB8), GUEST_U32(i + TSFP_MENUITEM_FLAGS),
+                    GUEST_F32(i + TSFP_MENUITEM_SX0), GUEST_F32(i + TSFP_MENUITEM_SY0),
+                    GUEST_F32(i + TSFP_MENUITEM_SX1), GUEST_F32(i + TSFP_MENUITEM_SY1),
+                    GUEST_U32(i + TSFP_MENUITEM_CHOICE), GUEST_U32(i + TSFP_MENUITEM_CHOICE_COUNT));
+    }
+    if (clicks & (1L << RECOMP_MOUSE_LEFT)) {
+        it = over ? tsfp_menu_item_at(w, sx, sy) : 0;
+        if (it && GUEST_U32(it + TSFP_MENUITEM_KIND) == 1)
+            tsfp_menu_step_value(it, sx);
+        else if (it)
+            GUEST_U32(w + TSFP_MENUWINDOW_PRESSED) |= TSFP_MENU_A;
+    }
+    if (clicks & (1L << RECOMP_MOUSE_RIGHT))
+        GUEST_U32(w + TSFP_MENUWINDOW_PRESSED) |= TSFP_MENU_B;
+    /* The wheel over a row: a value row steps its value (up forward), any
+     * other gets left/right as from the pad, which is how sliders move. */
+    if (wheel && over && (it = tsfp_menu_item_at(w, sx, sy)) != 0) {
+        if (GUEST_U32(it + TSFP_MENUITEM_KIND) == 1)
+            tsfp_guest_call(wheel > 0 ? sub_000755D0 : sub_000756A0, 1, &it);
+        else
+            GUEST_U32(w + TSFP_MENUWINDOW_PRESSED) |= wheel > 0 ? TSFP_MENU_RIGHT : TSFP_MENU_LEFT;
+    }
+    if (s_menu_trace && (moved || clicks))
+        fprintf(stderr, "[MENU] window 0x%08X ctx %u rect %.1f,%.1f-%.1f,%.1f bounds %.1f,%.1f-%.1f,%.1f "
+                "pointer %.3f,%.3f%s -> %.1f,%.1f clicks 0x%lX item 0x%08X kind %d focus 0x%08X\n",
+                w, ctx, x0, y0, GUEST_F32(c + TSFP_MENUCONTEXT_X1), GUEST_F32(c + TSFP_MENUCONTEXT_Y1),
+                GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MIN_X), GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MIN_Y),
+                GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MAX_X), GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MAX_Y),
+                px, py, over ? "" : " (off)", sx, sy, clicks, it,
+                it ? (int)GUEST_U32(it + TSFP_MENUITEM_KIND) : -1,
+                GUEST_U32(w + TSFP_MENUWINDOW_FOCUS));
+}
+
+void sub_00073870(void)
+{
+    uint32_t w = GUEST_U32(g_esp + 4);  /* (MenuWindow *) */
+
+    sub_00073870_gen();
+    if (w)
+        tsfp_menu_mouse(w);
 }
 
 /* Non-zero when this frame's mouse movement is dropped: whenever the stick

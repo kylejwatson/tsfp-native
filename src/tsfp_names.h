@@ -501,6 +501,54 @@
 #define TSFP_CONTROLS_STYLE                      0x74u  /* int */
 #define TSFP_CONTROLS_TURN_SPEED                 0x78u  /* float */
 
+/* struct MenuContext, size 0x1E0 */
+#define TSFP_MENUCONTEXT_SIZE                    0x1E0u
+#define TSFP_MENUCONTEXT_FLAGS                   0x00u  /* uint */
+#define TSFP_MENUCONTEXT_TOP                     0x0Cu  /* MenuWindow * */
+#define TSFP_MENUCONTEXT_CURSOR_MODE             0x10u  /* int */
+#define TSFP_MENUCONTEXT_CURSOR_X                0x18u  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_Y                0x1Cu  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_SX               0x20u  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_SY               0x24u  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_MIN_X            0x48u  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_MIN_Y            0x4Cu  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_MAX_X            0x50u  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_MAX_Y            0x54u  /* float */
+#define TSFP_MENUCONTEXT_X0                      0x68u  /* float */
+#define TSFP_MENUCONTEXT_Y0                      0x6Cu  /* float */
+#define TSFP_MENUCONTEXT_X1                      0x70u  /* float */
+#define TSFP_MENUCONTEXT_Y1                      0x74u  /* float */
+#define TSFP_MENUCONTEXT_CURSOR_DRAW             0xF4u  /* void * */
+
+/* struct MenuItem */
+#define TSFP_MENUITEM_NEXT                       0x04u  /* MenuItem * */
+#define TSFP_MENUITEM_FLAGS                      0x28u  /* uint */
+#define TSFP_MENUITEM_ON_ACCEPT                  0x38u  /* void * */
+#define TSFP_MENUITEM_SX0                        0x78u  /* float */
+#define TSFP_MENUITEM_SY0                        0x7Cu  /* float */
+#define TSFP_MENUITEM_SX1                        0x80u  /* float */
+#define TSFP_MENUITEM_SY1                        0x84u  /* float */
+#define TSFP_MENUITEM_KIND                       0xB4u  /* int */
+#define TSFP_MENUITEM_CHOICE_COUNT               0xC4u  /* int */
+#define TSFP_MENUITEM_CHOICE                     0xC8u  /* int */
+#define TSFP_MENUITEM_CHOICES                    0xD8u  /* void * */
+
+/* struct MenuWindow */
+#define TSFP_MENUWINDOW_ON_UPDATE                0x0Cu  /* void * */
+#define TSFP_MENUWINDOW_ON_DRAW                  0x10u  /* void * */
+#define TSFP_MENUWINDOW_STYLE                    0x1Cu  /* void * */
+#define TSFP_MENUWINDOW_PARENT                   0x2Cu  /* MenuWindow * */
+#define TSFP_MENUWINDOW_CONTEXT                  0x38u  /* int */
+#define TSFP_MENUWINDOW_PLAYERS                  0x3Cu  /* uint */
+#define TSFP_MENUWINDOW_FLAGS                    0x40u  /* uint */
+#define TSFP_MENUWINDOW_PRESSED                  0xC4u  /* uint */
+#define TSFP_MENUWINDOW_HELD                     0xC8u  /* uint */
+#define TSFP_MENUWINDOW_CHILDREN                 0x16Cu  /* MenuWindow * */
+#define TSFP_MENUWINDOW_ITEMS                    0x178u  /* MenuItem * */
+#define TSFP_MENUWINDOW_FOCUS                    0x198u  /* MenuItem * */
+#define TSFP_MENUWINDOW_ON_ACCEPT                0x1BCu  /* void * */
+#define TSFP_MENUWINDOW_ON_BACK                  0x1C0u  /* void * */
+
 /* Control actions (Player.control_axis index) */
 #define TSFP_ACTION_MOVE_X                       0x0Eu
 #define TSFP_ACTION_MOVE_Y                       0x0Fu
