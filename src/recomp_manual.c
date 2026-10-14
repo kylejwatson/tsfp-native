@@ -139,11 +139,18 @@ void sub_000245C0(void)
  * hand and the aim. The pad keeps working beside it.
  *
  * What the stick path does that is kept: it only turns while the player has
- * control and in the movement states that look at all, the yaw wraps into
- * [0,360) and the pitch is clamped to +-g_pitch_limit (60), and the turn is
- * scaled by the camera's fov over its default one so a zoomed scope does not
- * swing wildly. Not kept: the 0.65 slow-down while aiming (aim_turn_scale),
- * which is there for a thumb, and auto-aim.
+ * control, in the movement states that look at all, and while the game has
+ * not frozen or neutralised the pad (tsfp_mouse_blocked); vertical movement
+ * counts as look-y input for the auto-lookahead (tsfp_mouse_cancel_lookahead);
+ * the moving crosshair leads a mouse turn as it does a stick's
+ * (tsfp_mouse_aim_lead); the yaw wraps into [0,360) and the pitch is clamped to +-g_pitch_limit (60),
+ * and the turn is scaled by the camera's fov over its default one so a zoomed
+ * scope does not swing wildly. Not kept: the 0.65 slow-down while aiming
+ * (aim_turn_scale), which is there for a thumb, and auto-aim.
+ *
+ * A frame's movement is what arrived up to the title's last Swap
+ * (recomp_mouse_frame_mark), not up to now, so a host that presents late
+ * does not hand the next frame its lateness as extra turn.
  *
  * Pitch: positive looks up; mouse y grows downwards, so it is subtracted.
  * Yaw: grows to the left (counter-clockwise from above), so mouse x, which
@@ -158,6 +165,7 @@ extern void sub_0025D520_gen(void);
 #define GUEST_U32(va) (*(volatile uint32_t *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
 #define GUEST_F32(va) (*(volatile float *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
 #define GUEST_S8(va)  (*(volatile int8_t *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
+#define GUEST_U8(va)  (*(volatile uint8_t *)((uint8_t *)g_xbox_mem_offset + (uint32_t)(va)))
 
 /* Mounted guns and seats, the two move states the walking path above skips.
  *
@@ -248,29 +256,80 @@ static void tsfp_mouse_look_mounted(uint32_t state, uint32_t mount,
     }
 }
 
-static void tsfp_mouse_look(void)
-{
-    uint32_t p, cam, state, mode;
-    long dx, dy;
-    float scale = 1.0f, yaw, pitch, limit;
-    int control;
+/* pad_neutralise (0x00042870) and pads_update (0x000438B0): which players'
+ * pads the game has set to neutral since it last polled them. The game takes
+ * the look away from the stick that way rather than through the control flag:
+ * level 2's opening camera pan (the script action at 0x00234800) eases every
+ * player's yaw and pitch to a target and neutralises pads 0 and 1 each frame
+ * while it runs, and player_update does the same when its player is not to
+ * be steered. The flag stays set, so the mouse turned the view and the pan
+ * pulled it back every frame. A bit per player number, cleared by the next
+ * poll. */
+extern void sub_00042870_gen(void);
+extern void sub_000438B0_gen(void);
+static uint32_t s_pads_neutral;
 
-    /* Taken every frame the look runs, used or not: what arrives while the
-     * player has no control (a cutscene, a death) is dropped, not saved up. */
-    if (!recomp_mouse_take_motion(&dx, &dy))
-        return;
-    p = GUEST_U32(TSFP_G_PLAYER);
-    if (!p || GUEST_U32(p + TSFP_PLAYER_PAD_INDEX) != 0)
-        return;                                 /* the mouse is player 1's */
-    state = GUEST_U32(p + TSFP_PLAYER_MOVE_STATE);
-    if (state == 0x20 || state == 0x100)
-        return;                                 /* states that do not look */
+void sub_00042870(void)
+{
+    uint32_t player = GUEST_U32(g_esp + 4);     /* before the body runs */
+
+    if (player < 32)
+        s_pads_neutral |= 1u << player;
+    sub_00042870_gen();
+}
+
+void sub_000438B0(void)
+{
+    sub_000438B0_gen();
+    s_pads_neutral = 0;
+}
+
+/* Non-zero when this frame's mouse movement is dropped: whenever the stick
+ * would not turn the view either. Read before the original body runs; it
+ * changes none of these. */
+static int tsfp_mouse_blocked(uint32_t p)
+{
+    uint32_t state = GUEST_U32(p + TSFP_PLAYER_MOVE_STATE), cam, mode;
+
+    if (GUEST_U32(TSFP_G_PADS_FROZEN))
+        return 1;                               /* pad_axis reads 0 */
+    if (s_pads_neutral & (1u << GUEST_U32(p + TSFP_PLAYER_PAD_INDEX)))
+        return 2;
+    /* player_apply_look skips 0x20 and 0x100; player_read_look_move reads no
+     * look at all in 0x100, 0x2000 and 0x20000. */
+    if (state == 0x20 || (state & 0x22100u))
+        return 3;
     cam = GUEST_U32(TSFP_G_CAMERA);
     mode = cam ? GUEST_U32(cam + TSFP_CAMERA_MODE) : 0;
-    control = GUEST_S8(p + TSFP_PLAYER_FLAGS) < 0 ||
-              (mode && GUEST_U32(mode) == 0x18 && state != 0x400 && state != 0x200);
-    if (!control)
-        return;
+    if (!(GUEST_S8(p + TSFP_PLAYER_FLAGS) < 0 ||
+          (mode && GUEST_U32(mode) == 0x18 && state != 0x400 && state != 0x200)))
+        return 4;                               /* no control */
+    return 0;
+}
+
+/* Auto-lookahead. Walking forward with no look-y input puts look_mode at 2,
+ * and in 2 the original body pulls the pitch towards level by 5% a vblank
+ * (when the profile's controls+2 has bit 3) until it is within half a
+ * degree, ignoring the stick's pitch; look-y input moves it to 1, which holds
+ * until the player stops. The mouse never counted as look-y input, so with
+ * the option on the game kept levelling the view the hand was aiming: the
+ * pull fought every vertical movement for as long as the walk lasted.
+ * Vertical mouse movement now does what the stick's does, before the body
+ * runs its state machine: 2 -> 1, and 0 -> 1 when moving (move.x, the body's
+ * own test, non-zero). */
+static void tsfp_mouse_cancel_lookahead(uint32_t p, uint32_t move)
+{
+    uint32_t m = GUEST_U32(p + TSFP_PLAYER_LOOK_MODE);
+
+    if (m == 2 || (m == 0 && GUEST_F32(move) != 0.0f))
+        GUEST_U32(p + TSFP_PLAYER_LOOK_MODE) = 1;
+}
+
+static void tsfp_mouse_look(uint32_t p, long dx, long dy)
+{
+    uint32_t cam = GUEST_U32(TSFP_G_CAMERA), state = GUEST_U32(p + TSFP_PLAYER_MOVE_STATE);
+    float scale = 1.0f, yaw, pitch, limit;
+
     if (cam) {
         float def = (GUEST_U32(cam + TSFP_CAMERA_MODE_A) == 0 && GUEST_U32(cam + TSFP_CAMERA_MODE_B) == 1)
                     ? GUEST_F32(TSFP_G_FOV_DEFAULT_ALT) : GUEST_F32(TSFP_G_FOV_DEFAULT);
@@ -290,7 +349,7 @@ static void tsfp_mouse_look(void)
         return;
     }
 
-    yaw =GUEST_F32(p + TSFP_PLAYER_YAW) - (float)recomp_mouse_counts_to_degrees(dx) * scale;
+    yaw = GUEST_F32(p + TSFP_PLAYER_YAW) - (float)recomp_mouse_counts_to_degrees(dx) * scale;
     while (yaw < 0.0f)
         yaw += 360.0f;
     while (yaw >= 360.0f)
@@ -305,10 +364,137 @@ static void tsfp_mouse_look(void)
     GUEST_F32(p + TSFP_PLAYER_PITCH) = pitch;
 }
 
+/* "Crosshair: On and moving". aim_update (0x0025A7F0), after the look,
+ * eases the crosshair (and the gun's aim) towards the look stick's raw
+ * deflection * -0.33, so the crosshair leads a turn by up to a third of the
+ * way to the screen's edge and drifts back when the turn stops. The camera's
+ * own turn does not wait for it. The mouse deflects no stick, so with the
+ * mouse the crosshair stayed put whatever the option said. Each frame the
+ * mouse turned the view, aim_update is handed, on top of the stick, the
+ * deflection that would have turned it as far: the stick turns
+ * aim_turn_scale * g_yaw_speed / ticks_per_second * ticks * (turn_speed +
+ * 0.5) degrees at full deflection past the 0.1 deadzone (pitch: g_pitch_speed
+ * and half the aiming slow-down), the same terms player_apply_look uses. */
+static uint32_t s_aim_player;
+static float s_aim_look[2];
+
+static float tsfp_stick_for(float degrees, float full)
+{
+    float d;
+
+    if (full <= 0.0f || degrees == 0.0f)
+        return 0.0f;
+    d = degrees / full;
+    if (d > 1.0f)
+        d = 1.0f;
+    if (d < -1.0f)
+        d = -1.0f;
+    return d > 0.0f ? 0.1f + 0.9f * d : -0.1f + 0.9f * d;   /* back through the deadzone */
+}
+
+static void tsfp_mouse_aim_lead(uint32_t p, long dx, long dy)
+{
+    uint32_t controls = GUEST_U32(p + TSFP_PLAYER_CONTROLS);
+    float ticks = GUEST_F32(TSFP_G_TICKS_PER_FRAME);
+    float tps = (float)(int32_t)GUEST_U32(TSFP_G_TICKS_PER_SECOND);
+    float aim = GUEST_F32(p + TSFP_PLAYER_AIM_TURN_SCALE);
+    float turn = controls ? GUEST_F32(controls + TSFP_CONTROLS_TURN_SPEED) + 0.5f : 1.0f;
+    float per = tps > 0.0f ? ticks * turn / tps : 0.0f;
+
+    /* yaw grows to the left and pitch upwards (tsfp_mouse_look); the stick's
+     * x and look-y push them the same way, so a right turn is negative x */
+    s_aim_look[0] = tsfp_stick_for(-(float)recomp_mouse_counts_to_degrees(dx),
+                                   aim * GUEST_F32(TSFP_G_YAW_SPEED) * per);
+    s_aim_look[1] = tsfp_stick_for(-(float)recomp_mouse_counts_to_degrees(dy),
+                                   (1.0f - (1.0f - aim) * 0.5f) * GUEST_F32(TSFP_G_PITCH_SPEED) * per);
+    if (controls && (GUEST_U8(controls + TSFP_CONTROLS_FLAGS) & 1))
+        s_aim_look[1] = -s_aim_look[1];         /* the raw stick, before invert look */
+    s_aim_player = p;
+}
+
+extern void sub_0025A7F0_gen(void);
+
+void sub_0025A7F0(void)
+{
+    uint32_t look = GUEST_U32(g_esp + 4);       /* (float *look) */
+    float x, y, ax, ay;
+
+    if (!s_aim_player || s_aim_player != GUEST_U32(TSFP_G_PLAYER) || !look) {
+        sub_0025A7F0_gen();
+        return;
+    }
+    s_aim_player = 0;
+    x = GUEST_F32(look);
+    y = GUEST_F32(look + 4);
+    ax = x + s_aim_look[0];
+    ay = y + s_aim_look[1];
+    GUEST_F32(look) = ax > 1.0f ? 1.0f : ax < -1.0f ? -1.0f : ax;
+    GUEST_F32(look + 4) = ay > 1.0f ? 1.0f : ay < -1.0f ? -1.0f : ay;
+    sub_0025A7F0_gen();
+    GUEST_F32(look) = x;                        /* player_update's own look vector */
+    GUEST_F32(look + 4) = y;
+}
+
+/* RECOMP_LOOK_TRACE=1: a line per player 1 frame -- the mouse counts, why
+ * they were dropped (blocked: 1 pads frozen, 2 pad neutralised, 3 move state,
+ * 4 no control), look_mode before and after the body, the profile's controls
+ * byte (bit 3: lookahead), and yaw/pitch at entry, after the body and after
+ * the mouse. How the walk-and-turn stutter and the level 2 pan were found. */
+static int s_look_trace = -1;
+
 void sub_0025D520(void)
 {
+    uint32_t p = GUEST_U32(TSFP_G_PLAYER);
+    uint32_t move = GUEST_U32(g_esp + 8);       /* (look, move, look_out) */
+    long dx = 0, dy = 0;
+    int mine, blocked = 0;
+    uint32_t mode0 = 0;
+    float yaw0 = 0, pitch0 = 0, yaw1 = 0, pitch1 = 0;
+
+    if (s_look_trace < 0) {
+        const char *e = getenv("RECOMP_LOOK_TRACE");
+        s_look_trace = e && *e && *e != '0';
+    }
+    /* The mouse is player 1's. Taken only in player 1's update, so another
+     * local player's does not swallow what came in between; taken every
+     * frame it runs, used or not, so movement while the view is not the
+     * player's is dropped rather than saved up. */
+    mine = p && GUEST_U32(p + TSFP_PLAYER_PAD_INDEX) == 0;
+    if (mine) {
+        recomp_mouse_take_motion(&dx, &dy);
+        blocked = tsfp_mouse_blocked(p);
+        if (s_look_trace) {
+            mode0 = GUEST_U32(p + TSFP_PLAYER_LOOK_MODE);
+            yaw0 = GUEST_F32(p + TSFP_PLAYER_YAW);
+            pitch0 = GUEST_F32(p + TSFP_PLAYER_PITCH);
+        }
+        if (!blocked && dy)
+            tsfp_mouse_cancel_lookahead(p, move);
+    }
     sub_0025D520_gen();
-    tsfp_mouse_look();
+    if (!mine)
+        return;
+    if (s_look_trace) {
+        yaw1 = GUEST_F32(p + TSFP_PLAYER_YAW);
+        pitch1 = GUEST_F32(p + TSFP_PLAYER_PITCH);
+    }
+    if (!blocked && (dx || dy)) {
+        uint32_t state = GUEST_U32(p + TSFP_PLAYER_MOVE_STATE);
+        tsfp_mouse_look(p, dx, dy);
+        if (state != 0x40 && state != 0x80)     /* mounted: the object turns */
+            tsfp_mouse_aim_lead(p, dx, dy);
+    }
+    if (s_look_trace) {
+        uint32_t controls = GUEST_U32(p + TSFP_PLAYER_CONTROLS);
+        fprintf(stderr, "[LOOK] clock %u state 0x%X flags 0x%02X mouse %ld,%ld blocked %d "
+                "mode %u>%u controls 0x%02X move %.2f yaw %.3f>%.3f>%.3f pitch %.3f>%.3f>%.3f\n",
+                GUEST_U32(TSFP_G_GAME_CLOCK), GUEST_U32(p + TSFP_PLAYER_MOVE_STATE),
+                GUEST_U32(p + TSFP_PLAYER_FLAGS) & 0xFFu, dx, dy, blocked,
+                mode0, GUEST_U32(p + TSFP_PLAYER_LOOK_MODE),
+                controls ? GUEST_U8(controls + TSFP_CONTROLS_FLAGS) : 0u,
+                GUEST_F32(move), yaw0, yaw1, GUEST_F32(p + TSFP_PLAYER_YAW),
+                pitch0, pitch1, GUEST_F32(p + TSFP_PLAYER_PITCH));
+    }
 }
 
 /* ── Manual function overrides ─────────────────────────────── */

@@ -25,7 +25,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 NAMES = os.path.join(HERE, "names.json")
 HEADER = os.path.join(ROOT, "src", "tsfp_names.h")
-GHIDRA_CLI = os.environ.get("GHIDRA_CLI", r"C:\ghidra-cli\ghidra.exe")
+# ghidra-cli: C:\ghidra-cli\ghidra.exe on the Windows machine, /opt/ghidra on
+# the Linux one (its Ghidra install is set with `ghidra config set
+# ghidra_install_dir ...`). GHIDRA_CLI overrides either.
+GHIDRA_CLI = os.environ.get("GHIDRA_CLI", r"C:\ghidra-cli\ghidra.exe" if os.name == "nt" else "/opt/ghidra")
 # Forward slashes: ghidra-cli matches a running bridge by the path string.
 PROJECT = os.path.join(ROOT, "ghidra", "tsfp.gpr").replace("\\", "/")
 PROGRAM = "default.xbe"

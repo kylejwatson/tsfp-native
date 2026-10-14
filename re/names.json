@@ -64,7 +64,7 @@
    "addr": "0x00042870",
    "name": "pad_neutralise",
    "sig": "void pad_neutralise(int player)",
-   "notes": "Clears a player's pad record to neutral (sticks 0x80, all buttons masked); called when a player has no control.",
+   "notes": "Clears a player's pad record to neutral (sticks 0x80, all buttons masked); called when a player has no control. Also called every frame by level 2's opening camera pan (script_camera_pan, pads 0 and 1) while the player's control flag stays set. Wrapped in src/recomp_manual.c: records which players were neutralised since the last poll, and mouse look is dropped for them.",
    "source": "mouse look (2026-10-10)"
   },
   {
@@ -106,7 +106,7 @@
    "addr": "0x000438B0",
    "name": "pads_update",
    "sig": "void pads_update(void)",
-   "notes": "Once a frame: polls all four ports into g_pads (pad_poll_port) and copies a few fields to 0x7E7220.",
+   "notes": "Once a frame: polls all four ports into g_pads (pad_poll_port) and copies a few fields to 0x7E7220. Wrapped in src/recomp_manual.c to clear that record after the poll.",
    "source": "mouse look (2026-10-10)"
   },
   {
@@ -1513,6 +1513,13 @@
    "source": "Ghidra, tsfp-rewrite project"
   },
   {
+   "addr": "0x00234800",
+   "name": "script_camera_pan",
+   "sig": "void script_camera_pan(void)",
+   "notes": "A level-script action (level 2's opening, story/l_4_st.pak): each frame eases every player's yaw and pitch towards a target and calls pad_neutralise for pads 0 and 1, until the target is reached and the script moves on. The player's control flag stays set throughout.",
+   "source": "mouse walk/pan fix (2026-10-13)"
+  },
+  {
    "addr": "0x00234A30",
    "name": "script_cb_1c_zone_release",
    "source": "Ghidra, tsfp-rewrite project"
@@ -1626,6 +1633,13 @@
    "source": "mouse look (2026-10-10)"
   },
   {
+   "addr": "0x0025A7F0",
+   "name": "aim_update",
+   "sig": "void aim_update(float *look)",
+   "notes": "Called by player_update after player_apply_look with the raw look stick (before deadzone). Eases Player.crosshair_offset and Player.aim_offset towards a target: an auto-aim target's screen position, or look * -0.33 (+0.33 for y with invert look; halved when Controls.style == 2) -- what \"Crosshair: On and moving\" shows, a crosshair that leads the turn by up to a third of the way to the screen edge. Step per tick: (target - offset) * 0.1. The camera's turn (player_apply_look) does not read these offsets. Wrapped in src/recomp_manual.c to add the mouse's equivalent stick deflection.",
+   "source": "moving crosshair (2026-10-13)"
+  },
+  {
    "addr": "0x0025C440",
    "name": "player_to_pad",
    "source": "Ghidra, tsfp-rewrite project"
@@ -1655,7 +1669,7 @@
    "addr": "0x0025D520",
    "name": "player_apply_look",
    "sig": "void player_apply_look(float *look, float *move, float *look_out)",
-   "notes": "Integrates the look input into the camera angles: yaw += aim_turn_scale * g_yaw_speed * look.x * frame_time * (camera fov / default fov), wrapped to [0,360); pitch the same with g_pitch_speed, clamped to +-g_pitch_limit. Only while the player has control ((char)flags < 0, or camera mode 0x18) and move_state is not 0x20/0x40/0x80/0x100. Wrapped in src/recomp_manual.c to add mouse look.",
+   "notes": "Integrates the look input into the camera angles: yaw += aim_turn_scale * g_yaw_speed * look.x * frame_time * (camera fov / default fov), wrapped to [0,360); pitch the same with g_pitch_speed, clamped to +-g_pitch_limit. Only while the player has control ((char)flags < 0, or camera mode 0x18) and move_state is not 0x20/0x40/0x80/0x100. Wrapped in src/recomp_manual.c to add mouse look. look_mode (Player+0x108) state machine, called as (look, move, look_out): 0 -> 2 when look_out.y == 0 and |move.x| > 0.75; 0 -> 1 when look_out.y != 0 and move.x != 0; 1 -> 0 when move.x == 0; 2 -> 1 when look_out.y != 0. In 2, when controls+2 bit 3 (auto-lookahead) is set, pitch -= pitch * ticks * 0.05 and the stick pitch is ignored, back to 1 within 0.5 degrees.",
    "source": "mouse look (2026-10-10)"
   },
   {
@@ -2292,7 +2306,7 @@
      "off": "0x108",
      "name": "look_mode",
      "type": "int",
-     "notes": "0/1/2: look-spring state in player_apply_look"
+     "notes": "0/1/2 in player_apply_look: 0 standing, 1 moving with the look under the player's control, 2 walking forward with no look-y input (auto-lookahead levels the pitch when the profile has it)"
     },
     {
      "off": "0x114",
@@ -2322,6 +2336,18 @@
      "name": "aim_lock",
      "type": "int",
      "notes": "non-zero: player_read_look_move reads the alternate look/move actions"
+    },
+    {
+     "off": "0xF64",
+     "name": "crosshair_offset",
+     "type": "float[2]",
+     "notes": "screen offset of the crosshair, eased towards the look stick * -0.33 by aim_update (x: positive is right)"
+    },
+    {
+     "off": "0xF6C",
+     "name": "aim_offset",
+     "type": "float[2]",
+     "notes": "the gun's aim offset, eased like crosshair_offset (aim_update)"
     },
     {
      "off": "0xF7C",
@@ -2355,8 +2381,8 @@
     {
      "off": "0x1500",
      "name": "controls",
-     "type": "void *",
-     "notes": "profile control settings: +2 bit 0 invert look, +0x74 control style"
+     "type": "Controls *",
+     "notes": "the profile's control settings (Controls)"
     }
    ]
   },
@@ -2387,6 +2413,32 @@
      "name": "fov",
      "type": "float",
      "notes": "current field of view; zooming lowers it, and the look speed with it"
+    }
+   ]
+  },
+  {
+   "name": "Controls",
+   "size": "0x7C",
+   "notes": "A profile's control settings, the Controls screen. Player.controls points at it.",
+   "source": "moving crosshair (2026-10-13)",
+   "fields": [
+    {
+     "off": "0x2",
+     "name": "flags",
+     "type": "byte",
+     "notes": "bit 0 inverse look, bit 3 auto-lookahead (player_apply_look levels the pitch while walking)"
+    },
+    {
+     "off": "0x74",
+     "name": "style",
+     "type": "int",
+     "notes": "2: player_apply_look uses no stick deadzone (0.1 otherwise) and accelerates the look; aim_update halves the crosshair lead"
+    },
+    {
+     "off": "0x78",
+     "name": "turn_speed",
+     "type": "float",
+     "notes": "Turn Speed slider; the look is scaled by turn_speed + 0.5"
     }
    ]
   }

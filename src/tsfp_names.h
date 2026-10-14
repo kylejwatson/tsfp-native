@@ -293,6 +293,7 @@
 #define TSFP_FN_ASSAULT_STAGES_SETUP             0x002338D0u
 #define TSFP_FN_SCRIPT_LATCH_SWITCH              0x002344D0u
 #define TSFP_FN_SPAWNER_ACT_45                   0x002345B0u
+#define TSFP_FN_SCRIPT_CAMERA_PAN                0x00234800u
 #define TSFP_FN_SCRIPT_CB_1C_ZONE_RELEASE        0x00234A30u
 #define TSFP_FN_SCRIPT_CB_20_PLAYER1_TO_PAD      0x00234A50u
 #define TSFP_FN_SCRIPT_CB_21_PLAYER2_TO_PAD      0x00234AC0u
@@ -315,6 +316,7 @@
 #define TSFP_FN_SCRIPT_CB_10                     0x0024D220u
 #define TSFP_FN_PLAYER_LOOK_MOUNTED              0x00258A20u
 #define TSFP_FN_PLAYER_MOVE_WALK                 0x00258F50u
+#define TSFP_FN_AIM_UPDATE                       0x0025A7F0u
 #define TSFP_FN_PLAYER_TO_PAD                    0x0025C440u
 #define TSFP_FN_PLAYER_MOVE_ANIMATION            0x0025C650u
 #define TSFP_FN_PLAYER_READ_LOOK_MOVE            0x0025CE80u
@@ -446,12 +448,14 @@
 #define TSFP_PLAYER_YAW_PREV                     0x164u  /* float */
 #define TSFP_PLAYER_PITCH_PREV                   0x168u  /* float */
 #define TSFP_PLAYER_AIM_LOCK                     0xF5Cu  /* int */
+#define TSFP_PLAYER_CROSSHAIR_OFFSET             0xF64u  /* float[2] */
+#define TSFP_PLAYER_AIM_OFFSET                   0xF6Cu  /* float[2] */
 #define TSFP_PLAYER_AIMING                       0xF7Cu  /* int */
 #define TSFP_PLAYER_AIM_TURN_SCALE               0xF80u  /* float */
 #define TSFP_PLAYER_MOVE_RATE                    0xFC4u  /* float[2] */
 #define TSFP_PLAYER_MOVE_OUT                     0xFCCu  /* float[2] */
 #define TSFP_PLAYER_LOOK_OUT                     0xFD4u  /* float[2] */
-#define TSFP_PLAYER_CONTROLS                     0x1500u  /* void * */
+#define TSFP_PLAYER_CONTROLS                     0x1500u  /* Controls * */
 
 /* struct Camera, size 0x400 */
 #define TSFP_CAMERA_SIZE                         0x400u
@@ -459,6 +463,12 @@
 #define TSFP_CAMERA_MODE_B                       0x258u  /* int */
 #define TSFP_CAMERA_MODE                         0x26Cu  /* int * */
 #define TSFP_CAMERA_FOV                          0x384u  /* float */
+
+/* struct Controls, size 0x7C */
+#define TSFP_CONTROLS_SIZE                       0x7Cu
+#define TSFP_CONTROLS_FLAGS                      0x2u  /* byte */
+#define TSFP_CONTROLS_STYLE                      0x74u  /* int */
+#define TSFP_CONTROLS_TURN_SPEED                 0x78u  /* float */
 
 /* Control actions (Player.control_axis index) */
 #define TSFP_ACTION_MOVE_X                       0x0Eu

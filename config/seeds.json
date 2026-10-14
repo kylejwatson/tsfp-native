@@ -10,5 +10,9 @@
  {
   "start": "0x00138F70",
   "note": "Indirect-call target reached at a late Second Level checkpoint (caller 0x00139087); unresolved, the skipped call returned 0 and the guest later jumped to 0x00000000 (from 0x001CDD67)."
+ },
+ {
+  "start": "0x002E9E50",
+  "note": "Indirect-call target reached on Accept in the pause menu's Controls screen after changing an option (caller 0x0007B0F8); unresolved, the game then faulted in sub_0003C440."
  }
 ]
