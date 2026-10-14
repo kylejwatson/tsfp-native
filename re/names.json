@@ -41,6 +41,13 @@
    "source": "Ghidra, tsfp-rewrite project"
   },
   {
+   "addr": "0x0003D7B0",
+   "name": "lang_string",
+   "sig": "char * lang_string(int id)",
+   "notes": "Localised text by id (the loaded language's table at 0x6B7B08/0x6B7B10); 0 gives an empty string. Menu builders pass its result to menu_add_item/menu_add_choice.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
    "addr": "0x00042710",
    "name": "pad_is_connected",
    "sig": "int pad_is_connected(int port)",
@@ -230,6 +237,186 @@
    "addr": "0x0006C1E0",
    "name": "spawn_pad_choose",
    "source": "Ghidra, tsfp-rewrite project"
+  },
+  {
+   "addr": "0x00071010",
+   "name": "menu_cursor_on",
+   "sig": "void menu_cursor_on(void)",
+   "notes": "Sets the current menu context's cursor-mode flag (MenuContext +0x10, 0x7BA270). Called by MapMaker screens only.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00071030",
+   "name": "menu_cursor_off",
+   "sig": "void menu_cursor_off(void)",
+   "notes": "Clears the cursor-mode flag.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00071050",
+   "name": "menu_cursor_place",
+   "sig": "void menu_cursor_place(MenuContext *c)",
+   "notes": "Cursor normalised position (+0x18/+0x1C) -> screen position (+0x20/+0x24) through the screen scale/offset at 0x7BA038/0x7BA188/0x7BA180/0x7BA184, clamped to the bounds at +0x48..+0x54 (sets flag bit 2 when clamped).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00071140",
+   "name": "menu_cursor_move_to",
+   "sig": "void menu_cursor_move_to(float x, float y)",
+   "notes": "Puts the current context's cursor at a screen position (inverse of menu_cursor_place's mapping).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00071240",
+   "name": "menu_cursor_in_rect",
+   "sig": "int menu_cursor_in_rect(MenuWindow *w, int part, float *rect)",
+   "notes": "Cursor inside rect[x0,y0,x1,y1], when the window has no captured part (+0x194 == -1) or it is this one.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x000712A0",
+   "name": "menu_item_under_cursor",
+   "sig": "int menu_item_under_cursor(MenuWindow *w, MenuItem *it)",
+   "notes": "Cursor over the item's rect (+0x78..+0x84) or, for option items, its value area (menu_item_value_rect). Disabled items (+0x28 bit 2) never match.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00071360",
+   "name": "menu_pick_item",
+   "sig": "MenuItem * menu_pick_item(MenuWindow *w)",
+   "notes": "The item under the cursor (topmost/first by position).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x000717D0",
+   "name": "menu_add_choice",
+   "sig": "MenuChoice * menu_add_choice(char *text)",
+   "notes": "Adds a value to the last-added option item (g_menu_last_item).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00071830",
+   "name": "menu_add_off_on",
+   "sig": "void menu_add_off_on(void)",
+   "notes": "Adds the two choices lang 0x1837 / 0x1836 (Off/On) to the last option item.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00071E90",
+   "name": "menu_item_rect",
+   "sig": "void menu_item_rect(MenuWindow *w, MenuItem *it, float *rect)",
+   "notes": "Item's screen rectangle from its layout position and the window's scroll.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00073750",
+   "name": "menu_scroll_update",
+   "sig": "void menu_scroll_update(MenuWindow *w)",
+   "notes": "Scrolls a list window by +0x98 per step on the shoulder bits, or when the cursor holds the scroll arrows (+0x18C == -3/-4).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00073870",
+   "name": "menu_read_pads",
+   "sig": "void menu_read_pads(MenuWindow *w)",
+   "notes": "Turns the pads of the window's players (+0x3C mask) into menu button bits: +0xC4 pressed, +0xC8 held, with key repeat. In cursor mode the left stick moves the cursor instead of giving directions (with acceleration, +0x288/+0x28C) and the directional bits are skipped.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00074760",
+   "name": "menu_window_has_focus",
+   "sig": "int menu_window_has_focus(MenuWindow *w)",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x000755D0",
+   "name": "menu_option_next",
+   "sig": "void menu_option_next(MenuItem *it)",
+   "notes": "Next value of an option item.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x000756A0",
+   "name": "menu_option_prev",
+   "sig": "void menu_option_prev(MenuItem *it)",
+   "notes": "Previous value of an option item (skips disabled choices; numeric range mode when +0xB8 bit 0x200000: value -= step +0xA8, floor +0xA0).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00076810",
+   "name": "menu_draw_window",
+   "sig": "void menu_draw_window(MenuWindow *w, int pass, int depth)",
+   "notes": "Draws a window, its items (list +0x178, linked by +4) and recurses into child windows (+0x16C, linked by +0x30).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00077720",
+   "name": "menu_cursor_to_focus",
+   "sig": "void menu_cursor_to_focus(void)",
+   "notes": "In cursor mode, moves the cursor to the centre of the focused item.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x000777E0",
+   "name": "menu_cursor_update",
+   "sig": "void menu_cursor_update(void)",
+   "notes": "Cursor mode's replacement for up/down navigation: hit-tests the cursor against the scroll bar (part -2 thumb drag, -3/-4 arrows), the window and its items, focuses the item under the cursor (menu_focus_item) and records the cursor's relative position in the item (+0x1A0/+0x1A4).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00078780",
+   "name": "menu_draw_window_late",
+   "sig": "void menu_draw_window_late(MenuWindow *w, int pass)",
+   "notes": "Second draw pass; in cursor mode calls the context's cursor-draw callback (MenuContext +0xF4, 0x7BA354) when set.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00078950",
+   "name": "menu_draw",
+   "sig": "void menu_draw(MenuWindow *w, int pass)",
+   "notes": "menu_draw_window then menu_draw_window_late.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00079D60",
+   "name": "menu_add_item",
+   "sig": "void menu_add_item(char *text, int id, uint flags, int a, void *on_accept, void *on_b)",
+   "notes": "Adds an item to the window being built (becomes g_menu_last_item, 0x7BB1D8). flags 0x10000 = button, 0x20000 = option row.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x0007A7B0",
+   "name": "menu_window_update",
+   "sig": "void menu_window_update(MenuWindow *w)",
+   "notes": "Per-frame logic of a window and its children: open/close fades, reads the pads (menu_read_pads), moves focus with up/down (or menu_cursor_update in cursor mode), left/right change the focused option (menu_option_prev/next), A runs the item's +0x38 callback / the window's +0x1BC, B the window's +0x1C0.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x0007D480",
+   "name": "menu_make_option",
+   "sig": "void menu_make_option(uint flags, int a)",
+   "notes": "Turns g_menu_last_item into an option (value list) item.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x0007D820",
+   "name": "menu_item_value_rect",
+   "sig": "void menu_item_value_rect(MenuItem *it, float *rect)",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x0007FD20",
+   "name": "menu_click_option",
+   "sig": "void menu_click_option(void)",
+   "notes": "A on an option item in cursor mode: hit-tests the cursor against the value area and, for kind 6, the left/right arrows (menu_option_prev/next).",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x000800A0",
+   "name": "menu_item_activate_kind",
+   "sig": "void menu_item_activate_kind(MenuWindow *w, MenuItem *it)",
+   "notes": "A on an item, by kind (+0xB4): 2 -> 0x7FA00, 4 -> 0x75430, 5/6 -> menu_click_option (value area / arrows).",
+   "source": "menu mouse study (2026-10-14)"
   },
   {
    "addr": "0x0009B2F0",
@@ -1885,6 +2072,13 @@
    "source": "Ghidra, tsfp-rewrite project"
   },
   {
+   "addr": "0x002EA3F0",
+   "name": "menu_build_controls",
+   "sig": "void menu_build_controls(MenuWindow *w)",
+   "notes": "Builds the Controls screen (both the front end's and the pause menu's): option rows 0x1809 (control scheme), 0x17F6/0x1802/0x17F9 (Off/On), 0x17F7, 0x17CF, 0x1803 (5 choices), 0x1805, 0x180D, then Accept 0x1B08 (handler 0x002E9E50, the one fix 30 seeded; 0x002CBE00 when 0x79094C > 100) and Cancel 0x1B0B. The place to add PC rows.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
    "addr": "0x0034EB00",
    "name": "uplink_target_filter",
    "source": "Ghidra, tsfp-rewrite project"
@@ -2141,6 +2335,27 @@
    "type": "Camera *",
    "notes": "The current player's camera.",
    "source": "mouse look (2026-10-10)"
+  },
+  {
+   "addr": "0x007BA260",
+   "name": "g_menu_contexts",
+   "type": "MenuContext[]",
+   "notes": "One per menu context (MenuWindow +0x38), 0x1E0 bytes: +0 flags, +0xC top window, +0x10 cursor mode, +0x18/+0x1C cursor normalised, +0x20/+0x24 cursor on screen, +0x28.. cursor speed, +0x48..+0x54 cursor bounds, +0xF4 cursor-draw callback.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x007BA9E0",
+   "name": "g_menu_context",
+   "type": "int",
+   "notes": "The context being updated or drawn.",
+   "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x007BB1D8",
+   "name": "g_menu_last_item",
+   "type": "MenuItem *",
+   "notes": "The item menu_add_item made last; menu_make_option/menu_add_choice act on it.",
+   "source": "menu mouse study (2026-10-14)"
   },
   {
    "addr": "0x007DE308",

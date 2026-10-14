@@ -10,6 +10,7 @@
 #define TSFP_FN_MEMCPY                           0x000245C0u
 #define TSFP_FN_NOOP                             0x000389B0u
 #define TSFP_FN_OPTION_GAMEMODE                  0x0003C9B0u
+#define TSFP_FN_LANG_STRING                      0x0003D7B0u
 #define TSFP_FN_PAD_IS_CONNECTED                 0x00042710u
 #define TSFP_FN_PADS_ASSIGN_PLAYERS              0x00042720u
 #define TSFP_FN_PAD_MASK_BUTTONS                 0x00042830u
@@ -44,6 +45,32 @@
 #define TSFP_FN_SPAWNER_CHARACTER_SLOT           0x0006BC50u
 #define TSFP_FN_WEAPON_SLOT_LIST                 0x0006BD30u
 #define TSFP_FN_SPAWN_PAD_CHOOSE                 0x0006C1E0u
+#define TSFP_FN_MENU_CURSOR_ON                   0x00071010u
+#define TSFP_FN_MENU_CURSOR_OFF                  0x00071030u
+#define TSFP_FN_MENU_CURSOR_PLACE                0x00071050u
+#define TSFP_FN_MENU_CURSOR_MOVE_TO              0x00071140u
+#define TSFP_FN_MENU_CURSOR_IN_RECT              0x00071240u
+#define TSFP_FN_MENU_ITEM_UNDER_CURSOR           0x000712A0u
+#define TSFP_FN_MENU_PICK_ITEM                   0x00071360u
+#define TSFP_FN_MENU_ADD_CHOICE                  0x000717D0u
+#define TSFP_FN_MENU_ADD_OFF_ON                  0x00071830u
+#define TSFP_FN_MENU_ITEM_RECT                   0x00071E90u
+#define TSFP_FN_MENU_SCROLL_UPDATE               0x00073750u
+#define TSFP_FN_MENU_READ_PADS                   0x00073870u
+#define TSFP_FN_MENU_WINDOW_HAS_FOCUS            0x00074760u
+#define TSFP_FN_MENU_OPTION_NEXT                 0x000755D0u
+#define TSFP_FN_MENU_OPTION_PREV                 0x000756A0u
+#define TSFP_FN_MENU_DRAW_WINDOW                 0x00076810u
+#define TSFP_FN_MENU_CURSOR_TO_FOCUS             0x00077720u
+#define TSFP_FN_MENU_CURSOR_UPDATE               0x000777E0u
+#define TSFP_FN_MENU_DRAW_WINDOW_LATE            0x00078780u
+#define TSFP_FN_MENU_DRAW                        0x00078950u
+#define TSFP_FN_MENU_ADD_ITEM                    0x00079D60u
+#define TSFP_FN_MENU_WINDOW_UPDATE               0x0007A7B0u
+#define TSFP_FN_MENU_MAKE_OPTION                 0x0007D480u
+#define TSFP_FN_MENU_ITEM_VALUE_RECT             0x0007D820u
+#define TSFP_FN_MENU_CLICK_OPTION                0x0007FD20u
+#define TSFP_FN_MENU_ITEM_ACTIVATE_KIND          0x000800A0u
 #define TSFP_FN_PATH_ACROSS_GROUPS_EXPAND        0x0009B2F0u
 #define TSFP_FN_PATH_ACROSS_GROUPS               0x0009B540u
 #define TSFP_FN_PATH_WITHIN_GROUP_PUSH           0x0009B730u
@@ -364,6 +391,7 @@
 #define TSFP_FN_BOT_THINK_CTB                    0x002B7750u
 #define TSFP_FN_BOT_THINK                        0x002B7CC0u
 #define TSFP_FN_BOT_ATTACK                       0x002B7F30u
+#define TSFP_FN_MENU_BUILD_CONTROLS              0x002EA3F0u
 #define TSFP_FN_UPLINK_TARGET_FILTER             0x0034EB00u
 #define TSFP_FN_UPLINK_RELEASE                   0x0034EEE0u
 #define TSFP_FN_UPLINK_HOLD_STATIC               0x0034F080u
@@ -410,6 +438,9 @@
 #define TSFP_G_YAW_SPEED                         0x007B0CB8u  /* float */
 #define TSFP_G_PITCH_SPEED                       0x007B0CBCu  /* float */
 #define TSFP_G_CAMERA                            0x007B0CC0u  /* Camera * */
+#define TSFP_G_MENU_CONTEXTS                     0x007BA260u  /* MenuContext[] */
+#define TSFP_G_MENU_CONTEXT                      0x007BA9E0u  /* int */
+#define TSFP_G_MENU_LAST_ITEM                    0x007BB1D8u  /* MenuItem * */
 #define TSFP_MONKEYS_HELPED                      0x007DE308u
 #define TSFP_GLADIATOR                           0x007DE320u
 #define TSFP_MATCH                               0x007DE400u
