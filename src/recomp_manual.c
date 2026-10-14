@@ -160,6 +160,7 @@ void sub_000245C0(void)
  * right turned 55.00 degrees, 300 up raised the view 16.50 to the ceiling. */
 #include "recomp_mouse.h"
 #include "tsfp_names.h"
+#include "recomp_config.h"
 
 extern void sub_0025D520_gen(void);
 
@@ -580,6 +581,323 @@ void sub_00073870(void)
         tsfp_menu_mouse(w);
 }
 
+/* ── PC settings: a screen of our own in FP's menus ───────────
+ *
+ * The settings that live in the title's config file (resolution, widescreen,
+ * antialiasing, texture filtering, frame cap, FPS counter) as a menu screen,
+ * reached from a "PC Settings" entry added below Controls in the front end's
+ * Settings and in the pause menu. Everything is built with the game's own
+ * calls, as menu_build_controls builds Controls: a screen is a descriptor
+ * {build, update, 0, 0} opened with menu_open (0x79B70) on the root window,
+ * whose build adds the rows; Accept and Cancel close it with menu_back
+ * (0x79C00) as Controls' Cancel does. The descriptor's functions and the
+ * items' handlers are code addresses only recomp_lookup_manual knows: the
+ * game reaches them through indirect calls, which ask it first.
+ *
+ * The display is set up once at start-up, so Accept writes the config file
+ * and the new settings apply the next time the game starts (an environment
+ * variable still wins over the file, as everywhere). */
+extern void sub_00079D60_gen(void);     /* menu_add_item */
+extern void sub_0003D7B0(void);         /* lang_string */
+extern void sub_00075B70(void);         /* window header: flags, title, width, 0, draw cb */
+extern void sub_00071C50(void);
+extern void sub_00071B10(void);
+extern void sub_0007D480(void);         /* menu_make_option */
+extern void sub_000717D0(void);         /* menu_add_choice */
+extern void sub_00071830(void);         /* menu_add_off_on */
+extern void sub_00079710(void);
+extern void sub_000795F0(void);
+extern void sub_000771D0(void);
+extern void sub_00077140(void);
+extern void sub_00077110(void);
+extern void sub_002E45A0(void);
+extern void sub_00074A00(void);         /* help line: index, text, 0, 0 */
+extern void sub_00079B70(void);         /* menu_open(root, descriptor) */
+extern void sub_00079C00(void);         /* menu_back(root) */
+extern uint32_t xbox_HeapAlloc(uint32_t size, uint32_t alignment);
+
+/* Code addresses for the game to call: odd bytes inside the Controls
+ * builder, which nothing calls or jumps to. */
+#define TSFP_PC_OPEN    0x002EA8E1u     /* the "PC Settings" item */
+#define TSFP_PC_BUILD   0x002EA8E2u
+#define TSFP_PC_UPDATE  0x002EA8E3u
+#define TSFP_PC_ACCEPT  0x002EA8E4u
+#define TSFP_PC_CANCEL  0x002EA8E5u
+
+#define TSFP_PC_ROW_FLAGS 0x400u        /* Controls' rows on a one-player screen */
+#define TSFP_PC_ACCEPT_ID 10
+#define TSFP_PC_CANCEL_ID 11
+
+/* One row: a value list whose choices map to config values. */
+typedef struct { const char *label; int count; const char *names[6]; int values[6]; } TsfpPcRow;
+enum { PC_RES, PC_WIDE, PC_MSAA, PC_ANISO, PC_CAP, PC_FPS, PC_ROWS };
+static const TsfpPcRow s_pc_rows[PC_ROWS] = {
+    { "Resolution",        5, { "640x480", "720p", "1080p", "1440p", "4K" }, { 1, 720, 1080, 1440, 2160 } },
+    { "Widescreen",        2, { 0 }, { 0, 1 } },                         /* the game's Off/On */
+    { "Antialiasing",      4, { "Off", "2x", "4x", "8x" }, { 1, 2, 4, 8 } },
+    { "Texture filtering", 5, { "Bilinear", "2x", "4x", "8x", "16x" }, { 1, 2, 4, 8, 16 } },
+    { "Frame cap",         4, { "Adaptive", "60", "30", "Off" }, { 0, 60, 30, -1 } },
+    { "FPS counter",       2, { 0 }, { 0, 1 } },
+};
+
+static uint32_t s_pc_desc;              /* the descriptor, in guest memory */
+static uint32_t s_pc_window;            /* the screen while it is up */
+static RecompSettings s_pc_settings;    /* what the file held when it opened */
+static char s_pc_path[1024];
+
+/* A string the game can read; the same text always gets the same copy. */
+static uint32_t tsfp_guest_str(const char *s)
+{
+    static struct { const char *s; uint32_t va; } made[64];
+    static int n;
+    uint32_t len = (uint32_t)strlen(s) + 1, va;
+    int i;
+
+    for (i = 0; i < n; i++)
+        if (made[i].s == s)
+            return made[i].va;
+    va = xbox_HeapAlloc(len, 4);
+    if (!va)
+        return 0;
+    memcpy((uint8_t *)g_xbox_mem_offset + va, s, len);
+    if (n < 64) {
+        made[n].s = s;
+        made[n].va = va;
+        n++;
+    }
+    return va;
+}
+
+static uint32_t tsfp_lang(uint32_t id)
+{
+    return tsfp_guest_call(sub_0003D7B0, 1, &id);
+}
+
+static uint32_t tsfp_add_item(uint32_t text, int id, uint32_t flags, uint32_t on_accept)
+{
+    uint32_t a[6] = { text, (uint32_t)id, flags, 0, on_accept, 0 };
+    return tsfp_guest_call(sub_00079D60_gen, 6, a);
+}
+
+static int tsfp_in_game(void)
+{
+    return (int32_t)GUEST_U32(TSFP_G_MENU_MODE) > 100;   /* the pause menu, not the front end */
+}
+
+/* The root window our screen opens on and goes back to: the one the
+ * Controls entry beside ours uses. The Settings screen's (0x002CBE50) opens
+ * on 0x7613E4, the pause menu's (0x002EC1A0) and 0x002E7B70 on the root of
+ * the window's context. */
+static uint32_t s_pc_root;
+
+static uint32_t tsfp_menu_root(uint32_t w)
+{
+    uint32_t it = GUEST_U32(w + TSFP_MENUWINDOW_ITEMS);
+    int n;
+
+    for (n = 0; it && n < 64; it = GUEST_U32(it + TSFP_MENUITEM_NEXT), n++)
+        if (GUEST_U32(it + TSFP_MENUITEM_ON_ACCEPT) == 0x002CBE50u)
+            return GUEST_U32(TSFP_G_MENU_SETTINGS_ROOT);
+    return GUEST_U32(TSFP_G_MENU_ROOTS + 4u * GUEST_U32(w + TSFP_MENUWINDOW_CONTEXT));
+}
+
+/* The settings file's current value as one of the row's choices. */
+static int tsfp_pc_choice(int row)
+{
+    const RecompSettings *s = &s_pc_settings;
+    int v, i;
+
+    switch (row) {
+    case PC_RES:   v = s->resolution_scale; break;
+    case PC_WIDE:  v = s->widescreen != 0; break;
+    case PC_MSAA:  v = s->msaa; break;
+    case PC_ANISO: v = s->anisotropy; break;
+    case PC_CAP:
+        v = !strcmp(s->frame_cap, "adaptive") ? 0 : atoi(s->frame_cap);
+        if (v == 0 && strcmp(s->frame_cap, "adaptive"))
+            v = -1;
+        break;
+    default:       v = s->fps_overlay != 0; break;
+    }
+    for (i = 0; i < s_pc_rows[row].count; i++)
+        if (s_pc_rows[row].values[i] == v)
+            return i;
+    if (row == PC_RES && v >= 2 && v <= 8)      /* a multiple of 480 lines */
+        v *= 480;
+    for (i = s_pc_rows[row].count - 1; i > 0; i--)   /* the nearest below */
+        if (s_pc_rows[row].values[i] <= v)
+            return i;
+    return 0;
+}
+
+static void tsfp_pc_build(void)
+{
+    uint32_t w = GUEST_U32(g_esp + 4), a[5], it;
+    int r, i, game = tsfp_in_game();
+
+    s_pc_window = w;
+    if (!recomp_config_path() || snprintf(s_pc_path, sizeof s_pc_path, "%s", recomp_config_path()) <= 0)
+        if (!recomp_settings_path(0x45410066u, s_pc_path, sizeof s_pc_path))
+            s_pc_path[0] = 0;
+    recomp_settings_read(s_pc_path, &s_pc_settings);
+
+    /* As the Controls builder does for one player (0x002EA8E0). */
+    a[0] = 0x2000;
+    a[1] = tsfp_guest_str("PC Settings");
+    a[2] = GUEST_U32(GUEST_U32(0x004C0454u) != 1 ? 0x0047D1F4u : 0x0049F4A0u);
+    a[3] = 0;
+    a[4] = 0;
+    tsfp_guest_call(sub_00075B70, 5, a);
+    a[0] = 0x2000;
+    tsfp_guest_call(sub_00071C50, 1, a);
+    a[0] = 1; a[1] = 0x3F800000u; a[2] = 1; a[3] = 1;
+    tsfp_guest_call(sub_00071B10, 4, a);
+
+    for (r = 0; r < PC_ROWS; r++) {
+        const TsfpPcRow *row = &s_pc_rows[r];
+        it = tsfp_add_item(tsfp_guest_str(row->label), r, TSFP_PC_ROW_FLAGS | 0x20000u, 0);
+        GUEST_U32(it + 0x1C) = 3;
+        a[0] = TSFP_PC_ROW_FLAGS; a[1] = 0;
+        tsfp_guest_call(sub_0007D480, 2, a);
+        if (!row->names[0])
+            tsfp_guest_call(sub_00071830, 0, a);
+        else
+            for (i = 0; i < row->count; i++) {
+                a[0] = tsfp_guest_str(row->names[i]);
+                tsfp_guest_call(sub_000717D0, 1, a);
+            }
+        GUEST_U32(it + 0xBC) = 3;
+        GUEST_U32(it + TSFP_MENUITEM_CHOICE) = (uint32_t)tsfp_pc_choice(r);
+    }
+    /* A row that cannot be selected (flag 4, as the separators have). */
+    tsfp_add_item(tsfp_guest_str("Applies after a restart"), -1, TSFP_PC_ROW_FLAGS | 4u, 0);
+    a[0] = 1;
+    tsfp_guest_call(sub_00079710, 1, a);
+    if (game)
+        tsfp_guest_call(sub_000795F0, 0, a);
+    tsfp_add_item(tsfp_lang(0x1B08), TSFP_PC_ACCEPT_ID, TSFP_PC_ROW_FLAGS | 0x10000u, TSFP_PC_ACCEPT);
+    tsfp_add_item(tsfp_lang(0x1B0B), TSFP_PC_CANCEL_ID, TSFP_PC_ROW_FLAGS | 0x10000u, TSFP_PC_CANCEL);
+    a[0] = w;
+    if (game) {
+        a[0] = GUEST_U32(TSFP_G_MENU_BUILDING);
+        tsfp_guest_call(sub_000771D0, 1, a);
+    } else {
+        tsfp_guest_call(sub_002E45A0, 1, a);
+        tsfp_guest_call(sub_00077140, 1, a);
+    }
+    a[0] = 0; a[1] = tsfp_lang(0x1A26); a[2] = 0; a[3] = 0;
+    tsfp_guest_call(sub_00074A00, 4, a);
+    a[0] = 1; a[1] = tsfp_lang(0x1A27);
+    tsfp_guest_call(sub_00074A00, 4, a);
+    GUEST_U32(w + 0x210) = GUEST_U32(0x00478674u);
+    a[0] = w; a[1] = PC_RES;            /* focus the first row (0x00077110 finds it by id) */
+    tsfp_guest_call(sub_00077110, 2, a);
+    g_esp += 4;
+}
+
+static void tsfp_pc_update(void)
+{
+    g_esp += 4;
+}
+
+static void tsfp_pc_close(void)
+{
+    uint32_t root = s_pc_root;
+
+    s_pc_window = 0;
+    tsfp_guest_call(sub_00079C00, 1, &root);
+}
+
+static void tsfp_pc_accept(void)
+{
+    RecompSettings s = s_pc_settings;
+    uint32_t it;
+    int n, chosen[PC_ROWS], r;
+
+    for (r = 0; r < PC_ROWS; r++)
+        chosen[r] = tsfp_pc_choice(r);
+    it = s_pc_window ? GUEST_U32(s_pc_window + TSFP_MENUWINDOW_ITEMS) : 0;
+    for (n = 0; it && n < 64; it = GUEST_U32(it + TSFP_MENUITEM_NEXT), n++) {
+        uint32_t id = GUEST_U32(it + 0x14), c = GUEST_U32(it + TSFP_MENUITEM_CHOICE);
+        if (id < PC_ROWS && c < (uint32_t)s_pc_rows[id].count)
+            chosen[id] = (int)c;
+    }
+    /* A resolution the list cannot show is kept unless it was changed. */
+    if (chosen[PC_RES] != tsfp_pc_choice(PC_RES))
+        s.resolution_scale = s_pc_rows[PC_RES].values[chosen[PC_RES]];
+    s.widescreen  = s_pc_rows[PC_WIDE].values[chosen[PC_WIDE]];
+    s.msaa        = s_pc_rows[PC_MSAA].values[chosen[PC_MSAA]];
+    s.anisotropy  = s_pc_rows[PC_ANISO].values[chosen[PC_ANISO]];
+    r = s_pc_rows[PC_CAP].values[chosen[PC_CAP]];
+    if (r == 0)
+        snprintf(s.frame_cap, sizeof s.frame_cap, "adaptive");
+    else
+        snprintf(s.frame_cap, sizeof s.frame_cap, "%d", r < 0 ? 0 : r);
+    s.fps_overlay = s_pc_rows[PC_FPS].values[chosen[PC_FPS]];
+    if (memcmp(&s, &s_pc_settings, sizeof s)) {
+        int ok = s_pc_path[0] && recomp_settings_write(s_pc_path, &s);
+        fprintf(stderr, "[MENU] PC settings %s %s: resolution %d widescreen %d msaa %d anisotropy %d "
+                "frame cap %s fps %d (from the next start)\n", ok ? "written to" : "NOT written to",
+                s_pc_path, s.resolution_scale, s.widescreen, s.msaa, s.anisotropy, s.frame_cap, s.fps_overlay);
+    }
+    tsfp_pc_close();
+    g_esp += 4;
+}
+
+static void tsfp_pc_cancel(void)
+{
+    tsfp_pc_close();
+    g_esp += 4;
+}
+
+static void tsfp_pc_open(void)
+{
+    uint32_t w = GUEST_U32(g_esp + 4), a[2];    /* (window), as Controls' handlers take */
+
+    if (!s_pc_desc && (s_pc_desc = xbox_HeapAlloc(16, 4)) != 0) {
+        GUEST_U32(s_pc_desc + 0) = TSFP_PC_BUILD;
+        GUEST_U32(s_pc_desc + 4) = TSFP_PC_UPDATE;
+        GUEST_U32(s_pc_desc + 8) = 0;
+        GUEST_U32(s_pc_desc + 12) = 0;
+    }
+    if (s_pc_desc) {
+        a[0] = s_pc_root = tsfp_menu_root(w);
+        a[1] = s_pc_desc;
+        tsfp_guest_call(sub_00079B70, 2, a);
+    }
+    g_esp += 4;
+}
+
+/* menu_add_item: after the game adds its Controls entry (the Settings
+ * screen's, 0x002CBE50; the pause menu's, 0x002EC1A0; 0x002E7D50's,
+ * 0x002E7B70), add ours with the same flags. Ours becomes
+ * g_menu_last_item, which the next menu_add_item lays out; every one of
+ * these builders adds a plain item next. */
+void sub_00079D60(void)
+{
+    uint32_t on_accept = GUEST_U32(g_esp + 0x14), flags = GUEST_U32(g_esp + 0xC);
+    uint32_t item;
+
+    sub_00079D60_gen();
+    if (on_accept != 0x002E7B70u && on_accept != 0x002CBE50u && on_accept != 0x002EC1A0u)
+        return;
+    item = g_eax;
+    tsfp_add_item(tsfp_guest_str("PC Settings"), on_accept == 0x002E7B70u ? 2 : -1, flags, TSFP_PC_OPEN);
+    g_eax = item;
+}
+
+static recomp_func_t tsfp_pc_lookup(uint32_t va)
+{
+    switch (va) {
+    case TSFP_PC_OPEN:   return tsfp_pc_open;
+    case TSFP_PC_BUILD:  return tsfp_pc_build;
+    case TSFP_PC_UPDATE: return tsfp_pc_update;
+    case TSFP_PC_ACCEPT: return tsfp_pc_accept;
+    case TSFP_PC_CANCEL: return tsfp_pc_cancel;
+    }
+    return (recomp_func_t)0;
+}
+
 /* Non-zero when this frame's mouse movement is dropped: whenever the stick
  * would not turn the view either. Read before the original body runs; it
  * changes none of these. */
@@ -839,7 +1157,8 @@ recomp_func_t recomp_lookup_manual(uint32_t xbox_va)
      * if (xbox_va == 0x000ABCDE) return fixed_sub_000ABCDE;
      */
 
-    (void)xbox_va;
+    if (xbox_va >= TSFP_PC_OPEN && xbox_va <= TSFP_PC_CANCEL)
+        return tsfp_pc_lookup(xbox_va);
     return (recomp_func_t)0;
 }
 

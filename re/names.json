@@ -343,11 +343,25 @@
    "source": "menu mouse study (2026-10-14)"
   },
   {
+   "addr": "0x00075B70",
+   "name": "menu_begin_window",
+   "sig": "void menu_begin_window(uint flags, char *title, float width, int a, void *draw)",
+   "notes": "First call of a screen's build: header flags (0x2000 one-player screen, 0x8000 adds the Select/Back help lines), title, width. Acts on the window being built (0x7BB1E8).",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
    "addr": "0x00076810",
    "name": "menu_draw_window",
    "sig": "void menu_draw_window(MenuWindow *w, int pass, int depth)",
    "notes": "Draws a window, its items (list +0x178, linked by +4) and recurses into child windows (+0x16C, linked by +0x30).",
    "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00077110",
+   "name": "menu_focus_id",
+   "sig": "void menu_focus_id(MenuWindow *w, int id)",
+   "notes": "Gives the focus to the window's item with that id (item +0x14).",
+   "source": "PC settings screen (2026-10-14)"
   },
   {
    "addr": "0x00077720",
@@ -376,6 +390,34 @@
    "sig": "void menu_draw(MenuWindow *w, int pass)",
    "notes": "menu_draw_window then menu_draw_window_late.",
    "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x00078E50",
+   "name": "menu_window_create",
+   "sig": "MenuWindow * menu_window_create(MenuWindow *root, ScreenDesc *desc, int kind)",
+   "notes": "Takes a window from the pool at 0x6FEBE8, copies the descriptor's four words to +8..+0x14 and calls its build (+8) with the new window.",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
+   "addr": "0x00079860",
+   "name": "menu_switch",
+   "sig": "MenuWindow * menu_switch(MenuWindow *root, ScreenDesc *desc, int focus)",
+   "notes": "Closes the root's other screens and opens desc's (menu_window_create), restoring the focus remembered for it.",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
+   "addr": "0x00079B70",
+   "name": "menu_open",
+   "sig": "void menu_open(MenuWindow *root, ScreenDesc *desc)",
+   "notes": "Opens a screen on a root window and pushes it on the context's back stack. Descriptor = {build, update, 0, 0}; Controls is 0x524A40 {0x2EA8E0, 0x2EAB30}.",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
+   "addr": "0x00079C00",
+   "name": "menu_back",
+   "sig": "MenuWindow * menu_back(MenuWindow *root)",
+   "notes": "Pops the back stack and reopens the previous screen. Controls' Cancel (0x2E9EA0) is just menu_back(g_menu_roots[ctx]).",
+   "source": "PC settings screen (2026-10-14)"
   },
   {
    "addr": "0x00079D60",
@@ -2072,11 +2114,39 @@
    "source": "Ghidra, tsfp-rewrite project"
   },
   {
+   "addr": "0x002CBE50",
+   "name": "settings_open_controls",
+   "sig": "void settings_open_controls(void)",
+   "notes": "Settings > Controls: copies the profile's Controls into the context's editing copy, plays 0xD1E, menu_open(g_menu_settings_root, 0x524A40).",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
+   "addr": "0x002CBFC0",
+   "name": "menu_build_settings",
+   "sig": "void menu_build_settings(MenuWindow *w)",
+   "notes": "Front end's Settings screen: Audio/Video Options (0x2CBE10), Controls (0x2CBE50, opens on g_menu_settings_root), Copy Profile. PC Settings is added after Controls (recomp_manual.c).",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
    "addr": "0x002EA3F0",
    "name": "menu_build_controls",
    "sig": "void menu_build_controls(MenuWindow *w)",
    "notes": "Builds the Controls screen (both the front end's and the pause menu's): option rows 0x1809 (control scheme), 0x17F6/0x1802/0x17F9 (Off/On), 0x17F7, 0x17CF, 0x1803 (5 choices), 0x1805, 0x180D, then Accept 0x1B08 (handler 0x002E9E50, the one fix 30 seeded; 0x002CBE00 when 0x79094C > 100) and Cancel 0x1B0B. The place to add PC rows.",
    "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x002EA8E0",
+   "name": "controls_screen_build",
+   "sig": "void controls_screen_build(MenuWindow *w)",
+   "notes": "Controls screen's build (descriptor 0x524A40): menu_begin_window, menu_build_controls, help lines. The template for the PC Settings screen.",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
+   "addr": "0x002EC1A0",
+   "name": "pause_open_controls",
+   "sig": "void pause_open_controls(MenuWindow *w)",
+   "notes": "Pause menu > Controls: as settings_open_controls but on g_menu_roots[w->context].",
+   "source": "PC settings screen (2026-10-14)"
   },
   {
    "addr": "0x0034EB00",
@@ -2285,6 +2355,27 @@
    "source": "mouse look (2026-10-10)"
   },
   {
+   "addr": "0x007613E4",
+   "name": "g_menu_settings_root",
+   "type": "MenuWindow *",
+   "notes": "Root the front end's Settings screen opens Controls on.",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
+   "addr": "0x00761BBC",
+   "name": "g_menu_roots",
+   "type": "MenuWindow *[4]",
+   "notes": "Root window per menu context; screens open on it with menu_open (pause menu's Controls, Controls' Cancel).",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
+   "addr": "0x0079094C",
+   "name": "g_menu_mode",
+   "type": "int",
+   "notes": "Above 100 (0x65) in game (pause menus), below in the front end; builders pick layout and Accept/Cancel handlers by it.",
+   "source": "PC settings screen (2026-10-14)"
+  },
+  {
    "addr": "0x007A2BC8",
    "name": "tag_burning_bits",
    "source": "Ghidra, tsfp-rewrite project"
@@ -2356,6 +2447,13 @@
    "type": "MenuItem *",
    "notes": "The item menu_add_item made last; menu_make_option/menu_add_choice act on it.",
    "source": "menu mouse study (2026-10-14)"
+  },
+  {
+   "addr": "0x007BB1E8",
+   "name": "g_menu_building",
+   "type": "MenuWindow *",
+   "notes": "The window a build function is filling; menu_begin_window and the help-line calls act on it.",
+   "source": "PC settings screen (2026-10-14)"
   },
   {
    "addr": "0x007DE308",

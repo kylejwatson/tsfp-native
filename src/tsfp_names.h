@@ -60,11 +60,17 @@
 #define TSFP_FN_MENU_WINDOW_HAS_FOCUS            0x00074760u
 #define TSFP_FN_MENU_OPTION_NEXT                 0x000755D0u
 #define TSFP_FN_MENU_OPTION_PREV                 0x000756A0u
+#define TSFP_FN_MENU_BEGIN_WINDOW                0x00075B70u
 #define TSFP_FN_MENU_DRAW_WINDOW                 0x00076810u
+#define TSFP_FN_MENU_FOCUS_ID                    0x00077110u
 #define TSFP_FN_MENU_CURSOR_TO_FOCUS             0x00077720u
 #define TSFP_FN_MENU_CURSOR_UPDATE               0x000777E0u
 #define TSFP_FN_MENU_DRAW_WINDOW_LATE            0x00078780u
 #define TSFP_FN_MENU_DRAW                        0x00078950u
+#define TSFP_FN_MENU_WINDOW_CREATE               0x00078E50u
+#define TSFP_FN_MENU_SWITCH                      0x00079860u
+#define TSFP_FN_MENU_OPEN                        0x00079B70u
+#define TSFP_FN_MENU_BACK                        0x00079C00u
 #define TSFP_FN_MENU_ADD_ITEM                    0x00079D60u
 #define TSFP_FN_MENU_WINDOW_UPDATE               0x0007A7B0u
 #define TSFP_FN_MENU_MAKE_OPTION                 0x0007D480u
@@ -391,7 +397,11 @@
 #define TSFP_FN_BOT_THINK_CTB                    0x002B7750u
 #define TSFP_FN_BOT_THINK                        0x002B7CC0u
 #define TSFP_FN_BOT_ATTACK                       0x002B7F30u
+#define TSFP_FN_SETTINGS_OPEN_CONTROLS           0x002CBE50u
+#define TSFP_FN_MENU_BUILD_SETTINGS              0x002CBFC0u
 #define TSFP_FN_MENU_BUILD_CONTROLS              0x002EA3F0u
+#define TSFP_FN_CONTROLS_SCREEN_BUILD            0x002EA8E0u
+#define TSFP_FN_PAUSE_OPEN_CONTROLS              0x002EC1A0u
 #define TSFP_FN_UPLINK_TARGET_FILTER             0x0034EB00u
 #define TSFP_FN_UPLINK_RELEASE                   0x0034EEE0u
 #define TSFP_FN_UPLINK_HOLD_STATIC               0x0034F080u
@@ -430,6 +440,9 @@
 #define TSFP_G_GAME_CLOCK                        0x007497B0u  /* uint */
 #define TSFP_G_XINPUT_CONNECTED_MASK             0x0074D0FCu  /* uint */
 #define TSFP_G_XINPUT_HANDLES                    0x0074D100u  /* uint[4] */
+#define TSFP_G_MENU_SETTINGS_ROOT                0x007613E4u  /* MenuWindow * */
+#define TSFP_G_MENU_ROOTS                        0x00761BBCu  /* MenuWindow *[4] */
+#define TSFP_G_MENU_MODE                         0x0079094Cu  /* int */
 #define TSFP_TAG_BURNING_BITS                    0x007A2BC8u
 #define TSFP_ALERT_SLOTS                         0x007A2D80u
 #define TSFP_G_SIN_TABLE                         0x007A38A0u  /* float[2048] */
@@ -441,6 +454,7 @@
 #define TSFP_G_MENU_CONTEXTS                     0x007BA260u  /* MenuContext[] */
 #define TSFP_G_MENU_CONTEXT                      0x007BA9E0u  /* int */
 #define TSFP_G_MENU_LAST_ITEM                    0x007BB1D8u  /* MenuItem * */
+#define TSFP_G_MENU_BUILDING                     0x007BB1E8u  /* MenuWindow * */
 #define TSFP_MONKEYS_HELPED                      0x007DE308u
 #define TSFP_GLADIATOR                           0x007DE320u
 #define TSFP_MATCH                               0x007DE400u
