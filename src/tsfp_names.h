@@ -534,7 +534,8 @@
 #define TSFP_MENUCONTEXT_Y1                      0x74u  /* float */
 #define TSFP_MENUCONTEXT_CURSOR_DRAW             0xF4u  /* void * */
 
-/* struct MenuItem */
+/* struct MenuItem, size 0x10C */
+#define TSFP_MENUITEM_SIZE                       0x10Cu
 #define TSFP_MENUITEM_NEXT                       0x04u  /* MenuItem * */
 #define TSFP_MENUITEM_FLAGS                      0x28u  /* uint */
 #define TSFP_MENUITEM_ON_ACCEPT                  0x38u  /* void * */
@@ -547,7 +548,8 @@
 #define TSFP_MENUITEM_CHOICE                     0xC8u  /* int */
 #define TSFP_MENUITEM_CHOICES                    0xD8u  /* void * */
 
-/* struct MenuWindow */
+/* struct MenuWindow, size 0x23C */
+#define TSFP_MENUWINDOW_SIZE                     0x23Cu
 #define TSFP_MENUWINDOW_ON_UPDATE                0x0Cu  /* void * */
 #define TSFP_MENUWINDOW_ON_DRAW                  0x10u  /* void * */
 #define TSFP_MENUWINDOW_STYLE                    0x1Cu  /* void * */

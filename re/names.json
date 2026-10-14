@@ -2853,6 +2853,7 @@
   },
   {
    "name": "MenuItem",
+   "size": "0x10C",
    "notes": "One row of a menu window (MenuWindow.items, linked by next).",
    "source": "menu mouse study (2026-10-14)",
    "fields": [
@@ -2921,6 +2922,7 @@
   },
   {
    "name": "MenuWindow",
+   "size": "0x23C",
    "notes": "A menu screen or panel: items, child windows, per-frame button bits.",
    "source": "menu mouse study (2026-10-14)",
    "fields": [

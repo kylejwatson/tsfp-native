@@ -75,8 +75,10 @@ public class ApplyNames extends GhidraScript {
                 DataType t = type(str(f, "type"));
                 if (t == null)
                     continue;
-                if (off + t.getLength() > st.getLength())
-                    st.growStructure(off + t.getLength() - st.getLength());
+                // An empty structure reports a length of 1 but has no bytes.
+                int have = st.isZeroLength() ? 0 : st.getLength();
+                if (off + t.getLength() > have)
+                    st.growStructure(off + t.getLength() - have);
                 st.replaceAtOffset(off, t, t.getLength(), str(f, "name"), str(f, "notes"));
             }
             if (str(s, "notes") != null)
