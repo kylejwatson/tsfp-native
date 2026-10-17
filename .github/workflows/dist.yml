@@ -1,0 +1,73 @@
+# The shareable Linux build, made on a runner that has no game files.
+#
+# The runner never sees the disc: the runtime is built without the lifted
+# code (CMakeLists.txt builds the runtime only when src/recomp/gen is empty)
+# and the title kit is made from kit_inputs/ (the XBE's hash, the digests of
+# the files a correct lift produces, the XDK symbol names), which make_kit.sh
+# records whenever it runs with the disc. So whatever this job uploads cannot
+# contain anything from the game. The player's first run lifts and compiles
+# the game module from their own disc with the kit's Python and Zig.
+#
+# Ubuntu 22.04 for its older glibc: the executable runs on any distribution
+# with at least the glibc it was linked against (printed below).
+
+name: dist
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dist-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Shareable build (Linux x86-64)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang ninja-build pkg-config libsdl2-dev libssl-dev libvulkan-dev \
+            libshaderc-dev glslc libfreetype-dev libfontconfig-dev
+
+      - name: No game files in the checkout
+        run: |
+          test ! -e game_files
+          test -z "$(ls src/recomp/gen 2>/dev/null)"
+
+      - name: Build the runtime
+        run: CC=clang ./build.sh
+
+      # Fetches the pinned Zig and Python (checked by SHA-256) and makes the
+      # kit from kit_inputs/; refuses an executable that defines lifted code.
+      - name: Make dist/
+        run: CC=clang ./make_kit.sh
+
+      - name: Report
+        run: |
+          echo "glibc needed: $(objdump -T dist/futureperfect_recomp | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)"
+          cat dist/kit/kit.id
+          du -sh dist
+
+      - name: Package
+        run: |
+          name=futureperfect-recomp-linux-x86_64-${GITHUB_SHA::8}
+          mv dist "$name"
+          tar czf "$name.tar.gz" "$name"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.tar.gz
+          retention-days: 30

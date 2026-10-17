@@ -305,10 +305,23 @@ static BOOL load_game_xbe(void **out_data, size_t *out_size, char *err, size_t e
 
 static char g_kit_dir[1024];
 
+/* RECOMP_PYTHON, else the kit's own (make_kit.sh bundles one with capstone,
+ * so a player needs nothing installed), else python3 from PATH. */
 static const char *python_exe(void)
 {
+    static char kit_python[1200];
     const char *env = getenv("RECOMP_PYTHON");
-    return env && *env ? env : "python3";
+    struct stat st;
+    if (env && *env)
+        return env;
+#ifdef _WIN32
+    snprintf(kit_python, sizeof kit_python, "%s\\python\\python.exe", g_kit_dir);
+#else
+    snprintf(kit_python, sizeof kit_python, "%s/python/bin/python3", g_kit_dir);
+#endif
+    if (stat(kit_python, &st) == 0)
+        return kit_python;
+    return "python3";
 }
 
 static void build_script(char *out, size_t n)

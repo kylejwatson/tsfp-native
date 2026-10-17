@@ -119,6 +119,11 @@ if(XBOXRECOMP_GAME_MODULE)
     # registers the way the runtime libraries do (xbox_memory_layout.h).
     target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_GAME_MODULE RECOMP_MODULE_HOST)
 
+    # No lifted code (a checkout without the disc, e.g. CI): the runtime
+    # alone. The module is the player's to build, from the kit.
+    if(NOT RECOMP_GEN_SOURCES)
+        message(STATUS "No generated code in src/recomp/gen: building the runtime only")
+    else()
     add_library(futureperfect_game MODULE
         src/recomp_manual.c
         ${RECOMP_GEN_SOURCES}
@@ -140,7 +145,6 @@ if(XBOXRECOMP_GAME_MODULE)
     # defines it, and the executable reaches it through the module.
     if(XBOXRECOMP_REGS_IN_MODULE)
         target_compile_definitions(futureperfect_game PRIVATE RECOMP_REGS_IN_MODULE)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_REGS_IN_MODULE)
     endif()
     # -fwrapv/-fno-strict-aliasing: see the Linux branch below.
     # initial-exec: the guest register block is a thread-local of the
@@ -157,6 +161,10 @@ if(XBOXRECOMP_GAME_MODULE)
     target_link_options(futureperfect_game PRIVATE "LINKER:-Bsymbolic")
     target_link_libraries(futureperfect_game PRIVATE m)
     add_dependencies(${PROJECT_NAME} futureperfect_game)
+    endif()
+    if(XBOXRECOMP_REGS_IN_MODULE)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_REGS_IN_MODULE)
+    endif()
 else()
     add_executable(${PROJECT_NAME} WIN32
         ${GAME_SOURCES}
@@ -204,6 +212,10 @@ else()
     # names the generated sub_XXXXXXXX a host address is in.
     set_target_properties(${PROJECT_NAME} PROPERTIES ENABLE_EXPORTS ON)
     target_compile_definitions(${PROJECT_NAME} PRIVATE _GNU_SOURCE)
+    # Libraries beside the executable first: the shareable build carries the
+    # ones distributions rarely install (shaderc, glslang, SPIRV-Tools) in
+    # lib/ (make_kit.sh). Without that directory the system's are used.
+    target_link_options(${PROJECT_NAME} PRIVATE "LINKER:-rpath,$ORIGIN/lib")
 endif()
 
 # MSVC-specific: large address aware, increase section limit for big generated files
