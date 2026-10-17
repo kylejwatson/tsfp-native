@@ -44,6 +44,8 @@
 
 /* xboxrecomp runtime headers */
 #include <xbox/xboxrecomp.h>
+#include "kernel_disc.h"
+#include "recomp_config.h"
 #include "xbox_watchpoint.h"
 #include "recomp_mouse.h"
 
@@ -105,6 +107,7 @@ void recomp_exit_trace_init(void);      /* src/kernel/exit_trace.c */
  * start-up (xboxrecomp/src/kernel/recomp_module.h); its entry point and
  * dispatch table are reached through the loader. */
 #include "recomp_module.h"
+#include "recomp_setup.h"
 #define GAME_MODULE_NAME "futureperfect_game.so"
 #define recomp_dispatch_init recomp_module_dispatch_init
 #define xbe_entry_point recomp_module_entry
@@ -125,12 +128,16 @@ static BOOL load_xbe(const char *path, void **out_data, size_t *out_size);
  * neither case is the working directory anything in particular. So the game
  * is looked for beside the executable rather than beside the caller:
  *
- *   1. <exe dir>\\game\\               -- what a distributed build looks like
- *   2. <exe dir>\\YOUR_GAME_DIR     -- the development tree, where the build
+ *   1. RECOMP_GAME_DIR               -- running one build against another copy
+ *   2. game_dir in the title's settings file, which the first-run window
+ *      writes (a shared build asks for the disc; see first_run below)
+ *   3. <exe dir>\\game\\               -- what a distributed build looks like
+ *   4. <exe dir>\\YOUR_GAME_DIR     -- the development tree, where the build
  *                                     sits several levels under the repo
  *
- * RECOMP_GAME_DIR overrides both, for running one build against another copy
- * of the game files.
+ * Each may be a folder holding default.xbe or an Xbox disc image (.iso:
+ * xiso or a full Redump dump), which the kernel mounts as the disc
+ * (kernel_disc.h) so nothing needs extracting.
  * ============================================================ */
 
 /* The directory separator; Windows accepts '/' too, so the defaults below
@@ -141,8 +148,11 @@ static BOOL load_xbe(const char *path, void **out_data, size_t *out_size);
 #define PATH_SEP "/"
 #endif
 
-static char g_game_dir[1024];
-static char g_xbe_path[1024];
+#define TITLE_ID 0x45410066u
+#define GAME_TITLE "TimeSplitters Future Perfect"
+
+static char g_game_dir[1024];       /* a folder, or a disc image */
+static char g_xbe_path[1024];       /* default.xbe in the folder; empty for an image */
 
 static BOOL file_exists(const char *path)
 {
@@ -155,6 +165,17 @@ static BOOL file_exists(const char *path)
 #endif
 }
 
+static BOOL dir_exists(const char *path)
+{
+#if defined(_WIN32)
+    DWORD a = GetFileAttributesA(path);
+    return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY);
+#else
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+#endif
+}
+
 /* The last directory separator in a path, either kind. */
 static char *last_separator(char *path)
 {
@@ -162,24 +183,97 @@ static char *last_separator(char *path)
     return a > b ? a : b;
 }
 
+/* Whether `path` is the game: a folder with default.xbe (any case), the
+ * default.xbe itself (its folder is the game), or a disc image. Fills
+ * g_game_dir and g_xbe_path when it is. */
+static BOOL use_game_at(const char *path)
+{
+    char xbe[1024];
+    static const char *const names[] = { "default.xbe", "DEFAULT.XBE", "Default.xbe" };
+    size_t i;
+
+    if (!path || !*path)
+        return FALSE;
+    if (dir_exists(path)) {
+        for (i = 0; i < sizeof names / sizeof names[0]; i++) {
+            snprintf(xbe, sizeof xbe, "%s" PATH_SEP "%s", path, names[i]);
+            if (file_exists(xbe)) {
+                snprintf(g_game_dir, sizeof g_game_dir, "%s", path);
+                snprintf(g_xbe_path, sizeof g_xbe_path, "%s", xbe);
+                return TRUE;
+            }
+        }
+        return FALSE;
+    }
+    if (!file_exists(path))
+        return FALSE;
+    {
+        char copy[1024], *sep;
+        snprintf(copy, sizeof copy, "%s", path);
+        sep = last_separator(copy);
+        if (_stricmp(sep ? sep + 1 : copy, "default.xbe") == 0) {
+            if (sep)
+                *sep = '\0';
+            else
+                snprintf(copy, sizeof copy, ".");
+            snprintf(g_game_dir, sizeof g_game_dir, "%s", copy);
+            snprintf(g_xbe_path, sizeof g_xbe_path, "%s", path);
+            return TRUE;
+        }
+    }
+    if (xbox_disc_is_image(path)) {
+        snprintf(g_game_dir, sizeof g_game_dir, "%s", path);
+        g_xbe_path[0] = '\0';
+        return TRUE;
+    }
+    return FALSE;
+}
+
+/* The game folder or image the settings file names, or "". */
+static void settings_game_dir(char *out, size_t n)
+{
+    char path[1024];
+    RecompSettings st;
+    out[0] = '\0';
+    if (recomp_settings_path(TITLE_ID, path, sizeof path) &&
+        recomp_settings_read(path, &st))
+        snprintf(out, n, "%s", st.game_dir);
+}
+
+static void save_settings_game_dir(const char *game)
+{
+    char path[1024];
+    RecompSettings st;
+    if (!recomp_settings_path(TITLE_ID, path, sizeof path))
+        return;
+    recomp_settings_read(path, &st);        /* defaults when absent */
+    snprintf(st.game_dir, sizeof st.game_dir, "%s", game);
+    if (!recomp_settings_write(path, &st))
+        fprintf(stderr, "could not write %s\n", path);
+}
+
 /* Fills g_game_dir and g_xbe_path, or returns FALSE having left a message in
  * `tried` naming every place that was looked at -- which is the only useful
  * thing to tell somebody whose game files are somewhere else. */
 static BOOL find_game(char *tried, size_t tried_bytes)
 {
-    char exe[1024], dir[1024], candidate[1024];
+    char exe[1024], dir[1024], candidate[1024], saved[600];
     const char *env = getenv("RECOMP_GAME_DIR");
     char *slash;
     int i;
 
     tried[0] = '\0';
     if (env && *env) {
-        snprintf(g_game_dir, sizeof g_game_dir, "%s", env);
-        snprintf(g_xbe_path, sizeof g_xbe_path, "%s" PATH_SEP "default.xbe", env);
-        if (file_exists(g_xbe_path))
+        if (use_game_at(env))
             return TRUE;
-        snprintf(tried, tried_bytes, "RECOMP_GAME_DIR: %s", g_xbe_path);
+        snprintf(tried, tried_bytes, "RECOMP_GAME_DIR: %s", env);
         return FALSE;
+    }
+    settings_game_dir(saved, sizeof saved);
+    if (saved[0]) {
+        if (use_game_at(saved))
+            return TRUE;
+        snprintf(tried, tried_bytes, "%s (from the settings file)", saved);
     }
 
     if (!GetModuleFileNameA(NULL, exe, (DWORD)sizeof exe))
@@ -190,24 +284,143 @@ static BOOL find_game(char *tried, size_t tried_bytes)
         *slash = '\0';
 
     for (i = 0; i < 2; i++) {
+        size_t n;
         if (i == 0)
             snprintf(candidate, sizeof candidate, "%s" PATH_SEP "game", dir);
         else
             snprintf(candidate, sizeof candidate, "%s" PATH_SEP "%s", dir, YOUR_GAME_DIR);
-        snprintf(g_xbe_path, sizeof g_xbe_path, "%s" PATH_SEP "default.xbe", candidate);
-        if (file_exists(g_xbe_path)) {
-            snprintf(g_game_dir, sizeof g_game_dir, "%s", candidate);
+        if (use_game_at(candidate))
             return TRUE;
-        }
-        {
-            size_t n = strlen(tried);
-            snprintf(tried + n, tried_bytes - n, "%s%s", n ? "\n" : "", g_xbe_path);
-        }
+        n = strlen(tried);
+        snprintf(tried + n, tried_bytes - n, "%s%s" PATH_SEP "default.xbe",
+                 n ? "\n" : "", candidate);
     }
     return FALSE;
 }
 
+/* The XBE, from the folder or out of the image (mounting it). */
+static BOOL load_game_xbe(void **out_data, size_t *out_size, char *err, size_t err_bytes)
+{
+    if (g_xbe_path[0])
+        return load_xbe(g_xbe_path, out_data, out_size);
+    if (!xbox_disc_mount(g_game_dir, err, err_bytes))
+        return FALSE;
+    return xbox_disc_read_file("default.xbe", out_data, out_size);
+}
 
+#ifdef RECOMP_GAME_MODULE
+/* ============================================================
+ * First run of a shared build
+ *
+ * A shared build is this executable plus kit/ (xboxrecomp/scripts/
+ * make_kit.py) and nothing from the game. The first time it runs it asks
+ * for the player's disc, then builds the game module from it with the
+ * kit's build_module.py into the per-user module cache, showing progress
+ * (recomp_setup.h). Later runs find both and start at once; a new kit
+ * builds again, into a new directory.
+ * ============================================================ */
+
+static char g_kit_dir[1024];
+
+static const char *python_exe(void)
+{
+    const char *env = getenv("RECOMP_PYTHON");
+    return env && *env ? env : "python3";
+}
+
+static void build_script(char *out, size_t n)
+{
+    snprintf(out, n, "%s" PATH_SEP "toolkit" PATH_SEP "scripts" PATH_SEP "build_module.py",
+             g_kit_dir);
+}
+
+/* The picker's check: the right kind of thing, then the kit's own check of
+ * the XBE's hash (a wrong release is refused here, not after a build). */
+static int validate_disc(const char *path, char *msg, size_t n, void *ctx)
+{
+    char script[1200], out[1024];
+    char *argv[10];
+    int rc;
+    (void)ctx;
+
+    if (!use_game_at(path)) {
+        snprintf(msg, n, dir_exists(path)
+                 ? "That folder has no default.xbe in it. Choose the folder the disc "
+                   "was extracted to, or the disc image itself."
+                 : file_exists(path)
+                 ? "That file is not an Xbox disc image."
+                 : "There is nothing at that path.");
+        return 0;
+    }
+    build_script(script, sizeof script);
+    argv[0] = (char *)python_exe();
+    argv[1] = script;
+    argv[2] = "--kit";
+    argv[3] = g_kit_dir;
+    argv[4] = "--xbe";
+    argv[5] = (char *)path;
+    argv[6] = "--check";
+    argv[7] = NULL;
+    rc = recomp_setup_capture(argv, out, sizeof out);
+    if (rc == 0)
+        return 1;
+    if (rc < 0)
+        snprintf(msg, n, "Building the game needs Python 3 (%s): %s", python_exe(), out);
+    else
+        snprintf(msg, n, "%s", out[0] ? out : "The disc check failed.");
+    return 0;
+}
+
+/* Ask until a usable disc is chosen; FALSE if the player quit. */
+static BOOL first_run_pick(const char *why)
+{
+    char chosen[1024];
+    if (!recomp_setup_pick("Choose your game disc",
+            "This build contains none of " GAME_TITLE ". It makes the game from "
+            "your own copy, once, on this computer: choose your Xbox disc image "
+            "(.iso) or the folder you extracted the disc to.\n\n"
+            "The release it supports is the European (PAL) Xbox disc.",
+            why, validate_disc, NULL, chosen, sizeof chosen))
+        return FALSE;
+    /* Saved for every later start, which may run from another directory. */
+    char *abs = realpath(chosen, NULL);
+    if (abs) {
+        snprintf(chosen, sizeof chosen, "%s", abs);
+        free(abs);
+    }
+    if (!use_game_at(chosen))
+        return FALSE;
+    save_settings_game_dir(g_game_dir);
+    return TRUE;
+}
+
+/* Build the module into module_path; FALSE if the player gave up. */
+static BOOL first_run_build(const char *module_path)
+{
+    char script[1200], log[1300];
+    char *argv[12];
+    const char *sep;
+
+    build_script(script, sizeof script);
+    sep = strrchr(module_path, PATH_SEP[0]);
+    snprintf(log, sizeof log, "%.*s" PATH_SEP "build.log",
+             (int)(sep ? sep - module_path : 0), module_path);
+    argv[0] = (char *)python_exe();
+    argv[1] = script;
+    argv[2] = "--kit";
+    argv[3] = g_kit_dir;
+    argv[4] = "--xbe";
+    argv[5] = g_game_dir;
+    argv[6] = "--out";
+    argv[7] = (char *)module_path;
+    argv[8] = "--progress";
+    argv[9] = NULL;
+    return recomp_setup_run("Building the game",
+            "Making " GAME_TITLE " from your disc. This happens once and takes a "
+            "few minutes; it all runs on this computer.",
+            argv, log) ? TRUE : FALSE;
+}
+#endif /* RECOMP_GAME_MODULE */
 
 /* Recompiled entry point (generated by recomp pipeline) */
 #ifndef RECOMP_GAME_MODULE
@@ -603,12 +816,31 @@ static int run_game(void)
     /* Step 1: Find and load the XBE */
     {
         char tried[1024], message[1400];
-
-        if (!find_game(tried, sizeof tried)) {
+        BOOL found = find_game(tried, sizeof tried);
+#ifdef RECOMP_GAME_MODULE
+        int have_kit = recomp_module_kit_dir(g_kit_dir, sizeof g_kit_dir);
+        if (!found && have_kit) {
+            /* A shared build's first run, or the game moved. */
+            char why[1200] = "";
+            char saved[600];
+            settings_game_dir(saved, sizeof saved);
+            if (saved[0])
+                snprintf(why, sizeof why, "The game was at %s, which is not there any "
+                         "more.", saved);
+            recomp_setup_open(GAME_TITLE);
+            found = first_run_pick(why[0] ? why : NULL);
+            if (!found) {
+                recomp_setup_close();
+                return 1;
+            }
+        }
+#endif
+        if (!found) {
             snprintf(message, sizeof message,
                      "This needs the game's own files, which are not included.\n\n"
                      "Put them in a folder called \"game\" next to this program, so that\n"
-                     "\"game" PATH_SEP "default.xbe\" exists, or set RECOMP_GAME_DIR to where they are.\n\n"
+                     "\"game" PATH_SEP "default.xbe\" exists, or set RECOMP_GAME_DIR to where they are\n"
+                     "(a folder, or the disc image).\n\n"
                      "Looked for:\n%s", tried);
             fprintf(stderr, "%s\n", message);
             log_hint(message, sizeof message);
@@ -616,11 +848,14 @@ static int run_game(void)
             return 1;
         }
         printf("Game files: %s\n", g_game_dir);
-        if (!load_xbe(g_xbe_path, &xbe_data, &xbe_size)) {
+        if (!load_game_xbe(&xbe_data, &xbe_size, tried, sizeof tried)) {
             snprintf(message, sizeof message,
-                     "Found the game at\n%s\nbut could not read default.xbe.",
-                     g_game_dir);
+                     "Found the game at\n%s\nbut could not read default.xbe%s%s",
+                     g_game_dir, tried[0] ? ":\n" : ".", tried);
             log_hint(message, sizeof message);
+#ifdef RECOMP_GAME_MODULE
+            recomp_setup_close();
+#endif
             MessageBoxA(NULL, message, "Timesplitters - Future Perfect", MB_ICONERROR);
             return 1;
         }
@@ -646,7 +881,29 @@ static int run_game(void)
      * kernel, which may already resolve guest code through recomp_lookup. */
     {
         char message[1400];
-        if (!recomp_module_load(NULL, GAME_MODULE_NAME, message, sizeof message)) {
+        char module_path[1200];
+        const char *load_path = NULL;
+
+        /* A shared build's module is in the module cache, built from this
+         * disc on first run (or again after the kit or the disc changed). */
+        if (g_kit_dir[0] && !getenv("RECOMP_GAME_MODULE") &&
+            recomp_module_kit_module_path(TITLE_ID, GAME_MODULE_NAME, module_path,
+                                          sizeof module_path)) {
+            load_path = module_path;
+            if (!recomp_module_is_current(module_path, xbe_data, xbe_size)) {
+                BOOL built;
+                recomp_setup_open(GAME_TITLE);
+                built = first_run_build(module_path);
+                if (!built) {
+                    recomp_setup_close();
+                    xbox_MemoryLayoutShutdown();
+                    free(xbe_data);
+                    return 1;
+                }
+            }
+        }
+        recomp_setup_close();
+        if (!recomp_module_load(load_path, GAME_MODULE_NAME, message, sizeof message)) {
             fprintf(stderr, "%s\n", message);
             log_hint(message, sizeof message);
             MessageBoxA(NULL, message, "Timesplitters - Future Perfect", MB_ICONERROR);
