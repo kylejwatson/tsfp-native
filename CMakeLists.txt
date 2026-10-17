@@ -61,7 +61,8 @@ endif()
 # recomp_manual.c are futureperfect_game.so beside it, loaded at start-up.
 # The executable then contains nothing derived from the game and can be
 # shared; the module is what a player builds from their own disc. On by
-# default where it is supported (not Windows yet, see the toolkit option).
+# default off Windows; on Windows the module is futureperfect_game.dll and the
+# static build (OFF) stays the default for now.
 if(WIN32)
     set(_game_module_default OFF)
 else()
@@ -103,6 +104,24 @@ if(XBOXRECOMP_GAME_MODULE)
     set(RUNTIME_LIBS xbox_kernel xbox_d3d8 xbox_dsound xbox_input xbox_usb
                      xbox_apu xbox_nv2a xbox_video xbox_hle xbox_config platform)
 
+    if(WIN32)
+        # Every runtime object goes into the executable itself (not only
+        # those main.c reaches) and all of them are exported: the module
+        # imports the HLE replacements, the mouse, the settings and the
+        # runtime's data from the executable, through its import library
+        # (futureperfect_recomp.lib, which a player's module build links).
+        set(_objs)
+        foreach(_lib ${RUNTIME_LIBS})
+            list(APPEND _objs "$<TARGET_OBJECTS:${_lib}>")
+        endforeach()
+        add_executable(${PROJECT_NAME} WIN32 src/main.c ${_objs})
+        # LINKER_LANGUAGE: the objects include C++ (the XAudio2 output),
+        # which would ask for a C++ link rule this C project does not have;
+        # it is the same link.exe either way.
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            ENABLE_EXPORTS ON WINDOWS_EXPORT_ALL_SYMBOLS ON LINKER_LANGUAGE C)
+        target_link_libraries(${PROJECT_NAME} PRIVATE xboxrecomp platform)
+    else()
     add_executable(${PROJECT_NAME} src/main.c)
     target_link_libraries(${PROJECT_NAME} PRIVATE xboxrecomp)
     # Every runtime object, not only those main.c reaches: the module's
@@ -115,6 +134,7 @@ if(XBOXRECOMP_GAME_MODULE)
     endforeach()
     target_link_options(${PROJECT_NAME} PRIVATE
         "LINKER:--whole-archive" ${_whole} "LINKER:--no-whole-archive")
+    endif()
     # RECOMP_MODULE_HOST: main.c is runtime code too, and reaches the guest
     # registers the way the runtime libraries do (xbox_memory_layout.h).
     target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_GAME_MODULE RECOMP_MODULE_HOST)
@@ -140,7 +160,9 @@ if(XBOXRECOMP_GAME_MODULE)
         $<TARGET_PROPERTY:xbox_input,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:xbox_kernel,INTERFACE_INCLUDE_DIRECTORIES>
     )
-    target_compile_definitions(futureperfect_game PRIVATE _GNU_SOURCE)
+    if(NOT WIN32)
+        target_compile_definitions(futureperfect_game PRIVATE _GNU_SOURCE)
+    endif()
     # Who owns the guest register block (the toolkit's option): the module
     # defines it, and the executable reaches it through the module.
     if(XBOXRECOMP_REGS_IN_MODULE)
@@ -155,12 +177,38 @@ if(XBOXRECOMP_GAME_MODULE)
     # -Bsymbolic + no semantic interposition: the module's calls to its own
     # functions are direct, not through the PLT, and its recomp_lookup is its
     # own even though the executable exports one of the same name.
+    if(WIN32)
+        # A DLL binds its own calls internally (no -Bsymbolic needed) and
+        # imports the runtime from the executable's import library; its data
+        # through __declspec(dllimport) (RECOMP_MODULE_DLL, recomp_types.h).
+        # Exports: the names the loader asks for (recomp_module.c) and every
+        # HLE slot, so all of them. MSVC has no strict aliasing to turn off
+        # and wraps signed arithmetic in practice, as the static build does.
+        target_compile_definitions(futureperfect_game PRIVATE RECOMP_MODULE_DLL)
+        set_target_properties(futureperfect_game PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+        # ...except const data, which MSVC's export-all leaves out: the HLE
+        # slots in recomp_hle.c are all const, and the loader finds them by
+        # name. Exported one by one (configure again when that file changes).
+        set(_hle_c ${CMAKE_CURRENT_SOURCE_DIR}/src/recomp/gen/recomp_hle.c)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${_hle_c})
+        file(STRINGS ${_hle_c} _hle_lines REGEX "^(const uint32_t|void \\(\\*const) hle_(var|original)_")
+        foreach(_line ${_hle_lines})
+            string(REGEX MATCH "hle_(var|original)_[A-Za-z0-9_]+" _sym "${_line}")
+            target_link_options(futureperfect_game PRIVATE "/EXPORT:${_sym},DATA")
+        endforeach()
+        target_link_libraries(futureperfect_game PRIVATE ${PROJECT_NAME})
+        if(MSVC)
+            target_compile_options(futureperfect_game PRIVATE /bigobj /MP /w)
+            target_link_options(futureperfect_game PRIVATE /DEBUG)
+        endif()
+    else()
     target_compile_options(futureperfect_game PRIVATE
         -fwrapv -fno-strict-aliasing -w
         -ftls-model=initial-exec -fno-semantic-interposition)
     target_link_options(futureperfect_game PRIVATE "LINKER:-Bsymbolic")
     target_link_libraries(futureperfect_game PRIVATE m)
     add_dependencies(${PROJECT_NAME} futureperfect_game)
+    endif()
     endif()
     if(XBOXRECOMP_REGS_IN_MODULE)
         target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_REGS_IN_MODULE)

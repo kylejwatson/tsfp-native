@@ -70,9 +70,19 @@
  *   xbox_memory_layout.obj : error LNK2005: g_icall_count already defined
  *                            in recomp_manual.obj
  */
-extern volatile uint32_t g_icall_trace[16];
-extern volatile uint32_t g_icall_trace_idx;
-extern volatile uint64_t g_icall_count;
+/* Runtime data the game module reads. A Windows DLL reaches data in the
+ * executable only through __declspec(dllimport) (RECOMP_MODULE_DLL is set
+ * for the module's sources); everywhere else this is nothing. */
+#ifndef RECOMP_RUNTIME_DATA
+#  if defined(_WIN32) && defined(RECOMP_MODULE_DLL)
+#    define RECOMP_RUNTIME_DATA __declspec(dllimport)
+#  else
+#    define RECOMP_RUNTIME_DATA
+#  endif
+#endif
+extern RECOMP_RUNTIME_DATA volatile uint32_t g_icall_trace[16];
+extern RECOMP_RUNTIME_DATA volatile uint32_t g_icall_trace_idx;
+extern RECOMP_RUNTIME_DATA volatile uint64_t g_icall_count;
 
 typedef void (*recomp_func_t)(void);
 
@@ -94,11 +104,11 @@ typedef void (*recomp_func_t)(void);
 /* The guest stack pointer. At the moment an indirect call is refused, the
  * caller has already pushed its guest return address, so the top of the
  * guest stack is the call site -- the one thing the old log did not say. */
-extern ptrdiff_t g_xbox_mem_offset;
+extern RECOMP_RUNTIME_DATA ptrdiff_t g_xbox_mem_offset;
 /* The lifted code sections, so a value on the guest stack can be told
  * apart from data when naming the callers of a refused call. */
-extern uint32_t g_xbox_code_lo;
-extern uint32_t g_xbox_code_hi;
+extern RECOMP_RUNTIME_DATA uint32_t g_xbox_code_lo;
+extern RECOMP_RUNTIME_DATA uint32_t g_xbox_code_hi;
 /* The esp the dispatch macro captured. Not g_esp, which is stale by the time
  * a refused call is reported. Zero when the title's generated header predates
  * this, and the log then says it has no callers rather than inventing them. */

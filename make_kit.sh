@@ -25,16 +25,15 @@ DIST=${DIST:-dist}
 
 case "$(uname -s)" in
   Linux) OS=linux; BUILD_DIR=${BUILD_DIR:-build-linux}; EXE=futureperfect_recomp ;;
-  MINGW*|MSYS*|CYGWIN*) OS=windows; BUILD_DIR=${BUILD_DIR:-build}; EXE=futureperfect_recomp.exe ;;
+  # Windows: the module build (build_vs.bat module), not build/, which links
+  # the game into the executable.
+  MINGW*|MSYS*|CYGWIN*) OS=windows; BUILD_DIR=${BUILD_DIR:-build-mod}; EXE=futureperfect_recomp.exe ;;
   *) echo "make_kit.sh: no shareable build for $(uname -s) yet" >&2; exit 1 ;;
 esac
-
-if [ "$OS" = windows ]; then
-  # The Windows executable is still built with the game linked in
-  # (XBOXRECOMP_GAME_MODULE is off there: a DLL cannot import the exe's
-  # thread-local guest registers), so it must not be handed out.
-  echo "make_kit.sh: the Windows build still contains the game code; it cannot be shared until it loads the game as a module" >&2
-  exit 1
+# The Python that runs the fetch scripts and the checks below (Git Bash on
+# Windows usually has the py launcher, not python3).
+if [ -z "${HOSTPY:-}" ]; then
+  if command -v python3 >/dev/null 2>&1 && python3 -c '' 2>/dev/null; then HOSTPY=python3; else HOSTPY="py -3"; fi
 fi
 
 if [ -e "$DIST" ]; then
@@ -44,24 +43,33 @@ fi
 
 # The executable must be the runtime alone: a build with the lifted code
 # linked in (or a stale one) would hand the game out.
-if nm -D --defined-only "$BUILD_DIR/$EXE" | grep -q ' sub_[0-9A-F]\{8\}$'; then
-  echo "make_kit.sh: $BUILD_DIR/$EXE defines lifted functions (sub_*); build with XBOXRECOMP_GAME_MODULE=ON" >&2
-  exit 1
+if [ "$OS" = linux ]; then
+  if nm -D --defined-only "$BUILD_DIR/$EXE" | grep -q ' sub_[0-9A-F]\{8\}$'; then
+    echo "make_kit.sh: $BUILD_DIR/$EXE defines lifted functions (sub_*); build with XBOXRECOMP_GAME_MODULE=ON" >&2
+    exit 1
+  fi
+else
+  # A module-host executable exports its runtime and no sub_*; the static
+  # build exports nothing at all, so no export table fails too.
+  if ! $HOSTPY xboxrecomp/scripts/pe_exports.py --runtime-only "$BUILD_DIR/$EXE"; then
+    echo "make_kit.sh: $BUILD_DIR/$EXE is not a runtime-only build; build with XBOXRECOMP_GAME_MODULE=ON (build_vs.bat module)" >&2
+    exit 1
+  fi
 fi
 
 ZIG=${ZIG:-build-zig-$OS}
 EXTRA=()
 if [ "$ZIG" != none ]; then
   if [ ! -e "$ZIG/zig" ] && [ ! -e "$ZIG/zig.exe" ]; then
-    python3 xboxrecomp/scripts/fetch_zig.py --os "$OS" --out "$ZIG"
+    $HOSTPY xboxrecomp/scripts/fetch_zig.py --os "$OS" --out "$ZIG"
   fi
   EXTRA+=(--zig "$ZIG")
 fi
 PY=${PY:-build-python-$OS}
-PYTHON=python3
+PYTHON=$HOSTPY
 if [ "$PY" != none ]; then
   if [ ! -e "$PY/python" ]; then
-    python3 xboxrecomp/scripts/fetch_python.py --os "$OS" --out "$PY"
+    $HOSTPY xboxrecomp/scripts/fetch_python.py --os "$OS" --out "$PY"
   fi
   EXTRA+=(--python "$PY")
   if [ "$OS" = windows ]; then PYTHON=$PY/python/python.exe; else PYTHON=$PY/python/bin/python3; fi
@@ -72,6 +80,13 @@ if [ -n "${NO_VERIFY:-}" ]; then EXTRA+=(--no-verify); fi
 # or the runtime refuses it.
 if grep -q '^XBOXRECOMP_REGS_IN_MODULE:BOOL=ON$' "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
   EXTRA+=(--define RECOMP_REGS_IN_MODULE)
+fi
+# Windows: the module imports the runtime through the executable's import
+# library, and its data with __declspec(dllimport) (RECOMP_MODULE_DLL).
+# Headers are found with the kit's own Zig (MinGW target) unless CC says.
+if [ "$OS" = windows ]; then
+  EXTRA+=(--define RECOMP_MODULE_DLL --link-lib "$BUILD_DIR/futureperfect_recomp.lib")
+  if [ -z "${CC:-}" ] && [ "$ZIG" != none ]; then CC="$(cd "$ZIG" && pwd -W)/zig.exe cc -target x86_64-windows-gnu"; fi
 fi
 # With the disc, the kit is made from it and the facts a disc-free build needs
 # (XBE hash, generated-file digests, XDK symbol names) are recorded in
@@ -87,6 +102,8 @@ fi
   --split 400 --seeds xboxrecomp/config/seeds/45410066.json --seeds config/seeds.json \
   --cc "${CC:-clang}" --out "$DIST/kit" "${EXTRA[@]}"
 cp "$BUILD_DIR/$EXE" "$BUILD_DIR/input_bindings.json" "$DIST/"
+# The executable's symbols, so a fault report names runtime functions.
+if [ -f "$BUILD_DIR/futureperfect_recomp.pdb" ]; then cp "$BUILD_DIR/futureperfect_recomp.pdb" "$DIST/"; fi
 
 # Libraries the runtime needs that distributions rarely install, beside it
 # (it looks in lib/ first: RUNPATH $ORIGIN/lib).
@@ -108,7 +125,7 @@ cp xboxrecomp/LICENSE "$DIST/LICENSES/xboxrecomp-GPL-3.0.txt"
 cp xboxrecomp/LICENSE.upstream-MIT "$DIST/LICENSES/xboxrecomp-upstream-MIT.txt"
 cp xboxrecomp/NOTICE "$DIST/LICENSES/xboxrecomp-NOTICE.txt"
 cp "$L/LGPL-2.1.txt" "$DIST/LICENSES/"
-kit_field() { python3 -c "import json,sys; d=json.load(open('$DIST/kit/kit.json')); v=d
+kit_field() { $HOSTPY -c "import json,sys; d=json.load(open('$DIST/kit/kit.json')); v=d
 for k in sys.argv[1].split('.'): v=(v or {}).get(k)
 print(v or '')" "$1"; }
 {
@@ -141,7 +158,12 @@ print(v or '')" "$1"; }
     echo "  (kit/python/lib/python*/site-packages/capstone-*.dist-info/LICENSE.TXT)."
     echo
   fi
-  echo "Used from the system, not included: SDL2, the Vulkan loader, FreeType,"
-  echo "fontconfig, OpenSSL (libcrypto), the C and C++ runtimes."
+  if [ "$OS" = windows ]; then
+    echo "Used from the system, not included: Direct3D 11 and its shader compiler,"
+    echo "XAudio2, XInput, the C runtime (UCRT) and the Visual C++ runtime."
+  else
+    echo "Used from the system, not included: SDL2, the Vulkan loader, FreeType,"
+    echo "fontconfig, OpenSSL (libcrypto), the C and C++ runtimes."
+  fi
 } > "$DIST/THIRD_PARTY.txt"
 echo "dist: $(du -sh "$DIST" | cut -f1) in $DIST/"

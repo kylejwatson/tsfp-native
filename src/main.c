@@ -33,9 +33,9 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #if !defined(_WIN32)
 #include <dlfcn.h>
-#include <sys/stat.h>
 #include <unistd.h>
 #endif
 #include <stdlib.h>
@@ -86,12 +86,16 @@ extern ptrdiff_t g_xbox_mem_offset;
 void recomp_profile_dump(void);
 void recomp_exit_trace_init(void);      /* src/kernel/exit_trace.c */
 #ifdef RECOMP_GAME_MODULE
-/* The lifted code is futureperfect_game.so beside the executable, loaded at
- * start-up (xboxrecomp/src/kernel/recomp_module.h); its entry point and
- * dispatch table are reached through the loader. */
+/* The lifted code is futureperfect_game.so (.dll) beside the executable,
+ * loaded at start-up (xboxrecomp/src/kernel/recomp_module.h); its entry
+ * point and dispatch table are reached through the loader. */
 #include "recomp_module.h"
 #include "recomp_setup.h"
+#if defined(_WIN32)
+#define GAME_MODULE_NAME "futureperfect_game.dll"
+#else
 #define GAME_MODULE_NAME "futureperfect_game.so"
+#endif
 #define recomp_dispatch_init recomp_module_dispatch_init
 #define xbe_entry_point recomp_module_entry
 #else
@@ -306,7 +310,8 @@ static BOOL load_game_xbe(void **out_data, size_t *out_size, char *err, size_t e
 static char g_kit_dir[1024];
 
 /* RECOMP_PYTHON, else the kit's own (make_kit.sh bundles one with capstone,
- * so a player needs nothing installed), else python3 from PATH. */
+ * so a player needs nothing installed), else python3 (Windows: python) from
+ * PATH. */
 static const char *python_exe(void)
 {
     static char kit_python[1200];
@@ -321,7 +326,11 @@ static const char *python_exe(void)
 #endif
     if (stat(kit_python, &st) == 0)
         return kit_python;
+#ifdef _WIN32
+    return "python";
+#else
     return "python3";
+#endif
 }
 
 static void build_script(char *out, size_t n)
@@ -379,7 +388,11 @@ static BOOL first_run_pick(const char *why)
             why, validate_disc, NULL, chosen, sizeof chosen))
         return FALSE;
     /* Saved for every later start, which may run from another directory. */
+#ifdef _WIN32
+    char *abs = _fullpath(NULL, chosen, 0);
+#else
     char *abs = realpath(chosen, NULL);
+#endif
     if (abs) {
         snprintf(chosen, sizeof chosen, "%s", abs);
         free(abs);

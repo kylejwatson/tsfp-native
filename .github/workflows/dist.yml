@@ -1,4 +1,5 @@
-# The shareable Linux build, made on a runner that has no game files.
+# The shareable builds (Linux and Windows), made on runners that have no game
+# files.
 #
 # The runner never sees the disc: the runtime is built without the lifted
 # code (CMakeLists.txt builds the runtime only when src/recomp/gen is empty)
@@ -99,4 +100,56 @@ jobs:
         with:
           name: ${{ env.NAME }}
           path: ${{ env.NAME }}.tar.gz
+          retention-days: 30
+
+  # The same on Windows: the runtime executable exports itself (its import
+  # library goes into the kit), and the player's first run builds
+  # futureperfect_game.dll with the kit's Zig (MinGW target) from their disc.
+  windows:
+    name: Shareable build (Windows x86-64)
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: No game files in the checkout
+        run: |
+          test ! -e game_files
+          test -z "$(ls src/recomp/gen 2>/dev/null)"
+
+      # The module build with no generated code: the runtime only.
+      - name: Build the runtime
+        run: |
+          cmake -S . -B build-mod -G Ninja -DCMAKE_BUILD_TYPE=Release -DXBOXRECOMP_GAME_MODULE=ON
+          cmake --build build-mod --target futureperfect_recomp input_bindings
+
+      # Fetches the pinned Zig and Python and makes the kit from kit_inputs/;
+      # refuses an executable that is not a runtime-only module host.
+      - name: Make dist/
+        run: ./make_kit.sh
+
+      - name: Report
+        run: |
+          cat dist/kit/kit.id
+          du -sh dist
+
+      - name: Package
+        run: |
+          name=futureperfect-recomp-windows-x86_64-${GITHUB_SHA::8}
+          mv dist "$name"
+          7z a -tzip -mx=7 "$name.zip" "$name" > /dev/null
+          echo "NAME=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.zip
           retention-days: 30

@@ -1,5 +1,31 @@
 # Windows: plan for the switch back
 
+## Status (2026-10-17)
+
+Steps 0-4 are done as far as a scripted run can tell (CLAUDE.md 42):
+
+- 0: lift identical to `kit_inputs`; Ghidra lock cleared (owner was already `mail`).
+- 1: static build compiles; two fixes (`PC_WIDE` clash, MSAA views).
+- 2: scripted runs only (routes drift, so not every row): level 1,
+  1080p/4K widescreen, 4x MSAA, Redump image + save location, PC Settings
+  by mouse with the conf written, audio paths active in the log. **Left for
+  hands-on**: mouse look and mounted guns, menu wheel/list scrolling and
+  briefing click, mission 3 uplink map and teleport shimmer at 1080p, audio
+  by ear, settings applied on restart, Brain Drain (the route drifted into
+  level 1). The scripted `right` key did not step a PC Settings value row
+  while the mouse pointer was over it (a click did); worth a check by hand.
+- 3: `build_vs.bat module` -> `build-mod/` (exe + DLL); `make_kit.sh` makes a
+  Windows `dist/`; a first run with an empty profile and no Python or
+  compiler on `PATH` showed the picker, built the DLL with the kit's Zig and
+  played level 1. Not done: `SymFromAddr` names for a Zig-built DLL were not
+  checked in a real fault (the exports should give them).
+- 4: `windows` job added to `dist.yml`; it has not run yet.
+- **Not built on Linux**: the shared changes (`recomp_types.h`,
+  `xbox_memory_layout.h`, the Vulkan shim's MS views, `make_kit.py`,
+  `build_module.py` flag order, `make_kit.sh`) should be built and the kit
+  made there once; `kit_inputs/inputs.json` changed (the `recomp_types.h`
+  digest), so the Linux kit id changes too.
+
 The last Windows build and play test was on 2026-10-10/11, just before the
 Linux port (toolkit `3e60c97`, title `316cc11`). Since then about 80 toolkit
 files changed (+13k lines), 27 of them in `_WIN32` code paths, and the build
