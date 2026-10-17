@@ -1,6 +1,8 @@
 # Build artifacts
 build/
 build-linux/
+build-*/
+*.so
 out/
 bin/
 *.obj

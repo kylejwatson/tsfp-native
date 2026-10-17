@@ -56,6 +56,19 @@ if(RECOMP_ABI_CHECK)
     message(STATUS "ABI check enabled: callee-saved registers verified per call")
 endif()
 
+# The lifted game as a module (xboxrecomp/src/kernel/recomp_module.h): the
+# executable is the runtime and main.c only, and the generated code plus
+# recomp_manual.c are futureperfect_game.so beside it, loaded at start-up.
+# The executable then contains nothing derived from the game and can be
+# shared; the module is what a player builds from their own disc. On by
+# default where it is supported (not Windows yet, see the toolkit option).
+if(WIN32)
+    set(_game_module_default OFF)
+else()
+    set(_game_module_default ON)
+endif()
+option(XBOXRECOMP_GAME_MODULE "Load the lifted game as a shared module" ${_game_module_default})
+
 # Add xboxrecomp as a subdirectory -- this builds all 6 runtime libraries
 # and provides the 'xboxrecomp' umbrella target to link against.
 add_subdirectory(${XBOXRECOMP_DIR} ${CMAKE_BINARY_DIR}/xboxrecomp)
@@ -86,13 +99,63 @@ set(GAME_SOURCES
 #   src/recomp/recomp_dispatch.h     - binary search dispatch table
 #   src/recomp/recomp_types.h        - register model, ICALL macros, MEM helpers
 
-add_executable(${PROJECT_NAME} WIN32
-    ${GAME_SOURCES}
-    ${RECOMP_GEN_SOURCES}
-)
+if(XBOXRECOMP_GAME_MODULE)
+    set(RUNTIME_LIBS xbox_kernel xbox_d3d8 xbox_dsound xbox_input xbox_usb
+                     xbox_apu xbox_nv2a xbox_video xbox_hle xbox_config platform)
 
-# Link against the xboxrecomp umbrella target (all 6 runtime libraries)
-target_link_libraries(${PROJECT_NAME} PRIVATE xboxrecomp)
+    add_executable(${PROJECT_NAME} src/main.c)
+    target_link_libraries(${PROJECT_NAME} PRIVATE xboxrecomp)
+    # Every runtime object, not only those main.c reaches: the module's
+    # imports (the HLE replacements, the mouse, the settings) are resolved
+    # against the executable when it is loaded, and an archive member nothing
+    # in the executable references would otherwise be left out.
+    set(_whole)
+    foreach(_lib ${RUNTIME_LIBS})
+        list(APPEND _whole "$<TARGET_FILE:${_lib}>")
+    endforeach()
+    target_link_options(${PROJECT_NAME} PRIVATE
+        "LINKER:--whole-archive" ${_whole} "LINKER:--no-whole-archive")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_GAME_MODULE)
+
+    add_library(futureperfect_game MODULE
+        src/recomp_manual.c
+        ${RECOMP_GEN_SOURCES}
+        ${XBOXRECOMP_DIR}/src/kernel/recomp_module_abi.c
+    )
+    set_target_properties(futureperfect_game PROPERTIES PREFIX "")
+    # Built against the runtime's headers only: linking its libraries here
+    # would give the module a second copy of the runtime.
+    target_include_directories(futureperfect_game PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/recomp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/recomp/gen
+        ${XBOXRECOMP_DIR}/include
+        $<TARGET_PROPERTY:xbox_input,INTERFACE_INCLUDE_DIRECTORIES>
+        $<TARGET_PROPERTY:xbox_kernel,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+    target_compile_definitions(futureperfect_game PRIVATE _GNU_SOURCE)
+    # -fwrapv/-fno-strict-aliasing: see the Linux branch below.
+    # initial-exec: the guest registers are thread-locals of the executable,
+    # so their offsets are fixed; the default model for PIC would make every
+    # register access a __tls_get_addr call.
+    # -Bsymbolic + no semantic interposition: the module's calls to its own
+    # functions are direct, not through the PLT, and its recomp_lookup is its
+    # own even though the executable exports one of the same name.
+    target_compile_options(futureperfect_game PRIVATE
+        -fwrapv -fno-strict-aliasing -w
+        -ftls-model=initial-exec -fno-semantic-interposition)
+    target_link_options(futureperfect_game PRIVATE "LINKER:-Bsymbolic")
+    target_link_libraries(futureperfect_game PRIVATE m)
+    add_dependencies(${PROJECT_NAME} futureperfect_game)
+else()
+    add_executable(${PROJECT_NAME} WIN32
+        ${GAME_SOURCES}
+        ${RECOMP_GEN_SOURCES}
+    )
+
+    # Link against the xboxrecomp umbrella target (all 6 runtime libraries)
+    target_link_libraries(${PROJECT_NAME} PRIVATE xboxrecomp)
+endif()
 
 # The keyboard bindings, beside the exe where the runtime looks for them.
 add_custom_target(input_bindings ALL
