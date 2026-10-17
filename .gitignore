@@ -2,6 +2,7 @@
 build/
 build-linux/
 build-*/
+dist/
 *.so
 out/
 bin/
