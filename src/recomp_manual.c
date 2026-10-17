@@ -781,8 +781,8 @@ extern uint32_t xbox_HeapAlloc(uint32_t size, uint32_t alignment);
 
 /* One row: a value list whose choices map to config values. */
 typedef struct { const char *label; int count; const char *names[6]; int values[6]; } TsfpPcRow;
-enum { PC_RES, PC_WIDE, PC_MSAA, PC_ANISO, PC_CAP, PC_FPS, PC_ROWS };
-static const TsfpPcRow s_pc_rows[PC_ROWS] = {
+enum { PCROW_RES, PCROW_WIDE, PCROW_MSAA, PCROW_ANISO, PCROW_CAP, PCROW_FPS, PCROW_ROWS };
+static const TsfpPcRow s_pc_rows[PCROW_ROWS] = {
     { "Resolution",        5, { "640x480", "720p", "1080p", "1440p", "4K" }, { 1, 720, 1080, 1440, 2160 } },
     { "Widescreen",        2, { 0 }, { 0, 1 } },                         /* the game's Off/On */
     { "Antialiasing",      4, { "Off", "2x", "4x", "8x" }, { 1, 2, 4, 8 } },
@@ -859,11 +859,11 @@ static int tsfp_pc_choice(int row)
     int v, i;
 
     switch (row) {
-    case PC_RES:   v = s->resolution_scale; break;
-    case PC_WIDE:  v = s->widescreen != 0; break;
-    case PC_MSAA:  v = s->msaa; break;
-    case PC_ANISO: v = s->anisotropy; break;
-    case PC_CAP:
+    case PCROW_RES:   v = s->resolution_scale; break;
+    case PCROW_WIDE:  v = s->widescreen != 0; break;
+    case PCROW_MSAA:  v = s->msaa; break;
+    case PCROW_ANISO: v = s->anisotropy; break;
+    case PCROW_CAP:
         v = !strcmp(s->frame_cap, "adaptive") ? 0 : atoi(s->frame_cap);
         if (v == 0 && strcmp(s->frame_cap, "adaptive"))
             v = -1;
@@ -873,7 +873,7 @@ static int tsfp_pc_choice(int row)
     for (i = 0; i < s_pc_rows[row].count; i++)
         if (s_pc_rows[row].values[i] == v)
             return i;
-    if (row == PC_RES && v >= 2 && v <= 8)      /* a multiple of 480 lines */
+    if (row == PCROW_RES && v >= 2 && v <= 8)      /* a multiple of 480 lines */
         v *= 480;
     for (i = s_pc_rows[row].count - 1; i > 0; i--)   /* the nearest below */
         if (s_pc_rows[row].values[i] <= v)
@@ -904,7 +904,7 @@ static void tsfp_pc_build(void)
     a[0] = 1; a[1] = 0x3F800000u; a[2] = 1; a[3] = 1;
     tsfp_guest_call(sub_00071B10, 4, a);
 
-    for (r = 0; r < PC_ROWS; r++) {
+    for (r = 0; r < PCROW_ROWS; r++) {
         const TsfpPcRow *row = &s_pc_rows[r];
         it = tsfp_add_item(tsfp_guest_str(row->label), r, TSFP_PC_ROW_FLAGS | 0x20000u, 0);
         GUEST_U32(it + 0x1C) = 3;
@@ -941,7 +941,7 @@ static void tsfp_pc_build(void)
     a[0] = 1; a[1] = tsfp_lang(0x1A27);
     tsfp_guest_call(sub_00074A00, 4, a);
     GUEST_U32(w + 0x210) = GUEST_U32(0x00478674u);
-    a[0] = w; a[1] = PC_RES;            /* focus the first row (0x00077110 finds it by id) */
+    a[0] = w; a[1] = PCROW_RES;            /* focus the first row (0x00077110 finds it by id) */
     tsfp_guest_call(sub_00077110, 2, a);
     g_esp += 4;
 }
@@ -963,28 +963,28 @@ static void tsfp_pc_accept(void)
 {
     RecompSettings s = s_pc_settings;
     uint32_t it;
-    int n, chosen[PC_ROWS], r;
+    int n, chosen[PCROW_ROWS], r;
 
-    for (r = 0; r < PC_ROWS; r++)
+    for (r = 0; r < PCROW_ROWS; r++)
         chosen[r] = tsfp_pc_choice(r);
     it = s_pc_window ? GUEST_U32(s_pc_window + TSFP_MENUWINDOW_ITEMS) : 0;
     for (n = 0; it && n < 64; it = GUEST_U32(it + TSFP_MENUITEM_NEXT), n++) {
         uint32_t id = GUEST_U32(it + 0x14), c = GUEST_U32(it + TSFP_MENUITEM_CHOICE);
-        if (id < PC_ROWS && c < (uint32_t)s_pc_rows[id].count)
+        if (id < PCROW_ROWS && c < (uint32_t)s_pc_rows[id].count)
             chosen[id] = (int)c;
     }
     /* A resolution the list cannot show is kept unless it was changed. */
-    if (chosen[PC_RES] != tsfp_pc_choice(PC_RES))
-        s.resolution_scale = s_pc_rows[PC_RES].values[chosen[PC_RES]];
-    s.widescreen  = s_pc_rows[PC_WIDE].values[chosen[PC_WIDE]];
-    s.msaa        = s_pc_rows[PC_MSAA].values[chosen[PC_MSAA]];
-    s.anisotropy  = s_pc_rows[PC_ANISO].values[chosen[PC_ANISO]];
-    r = s_pc_rows[PC_CAP].values[chosen[PC_CAP]];
+    if (chosen[PCROW_RES] != tsfp_pc_choice(PCROW_RES))
+        s.resolution_scale = s_pc_rows[PCROW_RES].values[chosen[PCROW_RES]];
+    s.widescreen  = s_pc_rows[PCROW_WIDE].values[chosen[PCROW_WIDE]];
+    s.msaa        = s_pc_rows[PCROW_MSAA].values[chosen[PCROW_MSAA]];
+    s.anisotropy  = s_pc_rows[PCROW_ANISO].values[chosen[PCROW_ANISO]];
+    r = s_pc_rows[PCROW_CAP].values[chosen[PCROW_CAP]];
     if (r == 0)
         snprintf(s.frame_cap, sizeof s.frame_cap, "adaptive");
     else
         snprintf(s.frame_cap, sizeof s.frame_cap, "%d", r < 0 ? 0 : r);
-    s.fps_overlay = s_pc_rows[PC_FPS].values[chosen[PC_FPS]];
+    s.fps_overlay = s_pc_rows[PCROW_FPS].values[chosen[PCROW_FPS]];
     if (memcmp(&s, &s_pc_settings, sizeof s)) {
         int ok = s_pc_path[0] && recomp_settings_write(s_pc_path, &s);
         fprintf(stderr, "[MENU] PC settings %s %s: resolution %d widescreen %d msaa %d anisotropy %d "
