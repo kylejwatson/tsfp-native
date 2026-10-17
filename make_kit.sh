@@ -52,6 +52,12 @@ if [ "$ZIG" != none ]; then
   EXTRA+=(--zig "$ZIG")
 fi
 if [ -n "${NO_VERIFY:-}" ]; then EXTRA+=(--no-verify); fi
+# The module owns the guest registers when the build says so (the toolkit's
+# XBOXRECOMP_REGS_IN_MODULE); the player's module must be built the same way,
+# or the runtime refuses it.
+if grep -q '^XBOXRECOMP_REGS_IN_MODULE:BOOL=ON$' "$BUILD_DIR/CMakeCache.txt" 2>/dev/null; then
+  EXTRA+=(--define RECOMP_REGS_IN_MODULE)
+fi
 python3 xboxrecomp/scripts/make_kit.py --project . --xbe game_files/default.xbe \
   --module-name futureperfect_game --game-name "TimeSplitters Future Perfect" \
   --split 400 --seeds xboxrecomp/config/seeds/45410066.json --seeds config/seeds.json \

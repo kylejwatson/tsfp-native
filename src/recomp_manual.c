@@ -78,11 +78,11 @@ typedef void (*recomp_func_t)(void);
 
 /* ── Register state (defined in xbox_memory_layout.c) ──────── */
 
-/* These are defined thread-local in xbox_memory_layout.c. Declaring them
- * without the same storage class here does not fail to link -- it silently
- * resolves to different storage, so every read gets 0. That is why the log
- * below reported no call site: not because the guest esp was stale, but
- * because this file was not reading the guest esp at all. */
+/* g_eax, g_esp and the rest are fields of the per-thread register block that
+ * xbox_memory_layout.h declares; the header is the one way to reach them (a
+ * declaration of our own once silently read other storage, every value 0).
+ * RECOMP_MANUAL_TLS is for this file's own thread-locals. */
+#include "xbox_memory_layout.h"
 #if defined(_MSC_VER)
 #  define RECOMP_MANUAL_TLS __declspec(thread)
 #elif defined(__GNUC__) || defined(__clang__)
@@ -91,11 +91,9 @@ typedef void (*recomp_func_t)(void);
 #  define RECOMP_MANUAL_TLS _Thread_local
 #endif
 
-extern RECOMP_MANUAL_TLS uint32_t g_eax;
 /* The guest stack pointer. At the moment an indirect call is refused, the
  * caller has already pushed its guest return address, so the top of the
  * guest stack is the call site -- the one thing the old log did not say. */
-extern RECOMP_MANUAL_TLS uint32_t g_esp;
 extern ptrdiff_t g_xbox_mem_offset;
 /* The lifted code sections, so a value on the guest stack can be told
  * apart from data when naming the callers of a refused call. */
@@ -104,10 +102,8 @@ extern uint32_t g_xbox_code_hi;
 /* The esp the dispatch macro captured. Not g_esp, which is stale by the time
  * a refused call is reported. Zero when the title's generated header predates
  * this, and the log then says it has no callers rather than inventing them. */
-extern RECOMP_MANUAL_TLS uint32_t g_icall_saved_esp;
 /* Which dispatch form was refused: 0 unknown, 1 call, 2 jump. Unknown
  * means this title was lifted before the macros published it. */
-extern RECOMP_MANUAL_TLS uint32_t g_icall_dispatch_form;
 
 /* ── TimeSplitters: Future Perfect overrides ───────────────── */
 

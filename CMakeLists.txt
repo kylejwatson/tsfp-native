@@ -115,7 +115,9 @@ if(XBOXRECOMP_GAME_MODULE)
     endforeach()
     target_link_options(${PROJECT_NAME} PRIVATE
         "LINKER:--whole-archive" ${_whole} "LINKER:--no-whole-archive")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_GAME_MODULE)
+    # RECOMP_MODULE_HOST: main.c is runtime code too, and reaches the guest
+    # registers the way the runtime libraries do (xbox_memory_layout.h).
+    target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_GAME_MODULE RECOMP_MODULE_HOST)
 
     add_library(futureperfect_game MODULE
         src/recomp_manual.c
@@ -134,10 +136,18 @@ if(XBOXRECOMP_GAME_MODULE)
         $<TARGET_PROPERTY:xbox_kernel,INTERFACE_INCLUDE_DIRECTORIES>
     )
     target_compile_definitions(futureperfect_game PRIVATE _GNU_SOURCE)
+    # Who owns the guest register block (the toolkit's option): the module
+    # defines it, and the executable reaches it through the module.
+    if(XBOXRECOMP_REGS_IN_MODULE)
+        target_compile_definitions(futureperfect_game PRIVATE RECOMP_REGS_IN_MODULE)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE RECOMP_REGS_IN_MODULE)
+    endif()
     # -fwrapv/-fno-strict-aliasing: see the Linux branch below.
-    # initial-exec: the guest registers are thread-locals of the executable,
-    # so their offsets are fixed; the default model for PIC would make every
-    # register access a __tls_get_addr call.
+    # initial-exec: the guest register block is a thread-local of the
+    # executable (or, with RECOMP_REGS_IN_MODULE, of this module, in the
+    # static TLS glibc reserves for such modules), so its offset is fixed; the
+    # default model for PIC would make every register access a
+    # __tls_get_addr call.
     # -Bsymbolic + no semantic interposition: the module's calls to its own
     # functions are direct, not through the PLT, and its recomp_lookup is its
     # own even though the executable exports one of the same name.
