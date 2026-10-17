@@ -112,9 +112,11 @@ jobs:
       run:
         shell: bash
     steps:
+      # The toolkit only, not its own submodules: the build needs none, and
+      # xemu's nested tree has paths beyond Windows' length limit.
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
 
       - uses: ilammy/msvc-dev-cmd@v1
         with:
