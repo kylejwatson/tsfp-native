@@ -314,10 +314,23 @@ void sub_000438B0(void)
  *     pointer becomes its cursor; a pad or keyboard press or a deflected
  *     stick takes cursor mode away again, so up/down and left/right work as
  *     they always did. Only cursor modes turned on here are turned off.
+ *     The pad is looked at before the menu reads it, so the press that
+ *     takes cursor mode away already moves the focus or accepts; and as a
+ *     cursor over nothing leaves no focus (menu_cursor_update), the last
+ *     item the mouse focused gets it back.
  *   - Left click over an item is A. Value rows of kind 1 (left/right on the
  *     pad, and nothing at all in cursor mode) step back when the click is
  *     left of the middle of their value and forward otherwise. Right click
- *     is B anywhere.
+ *     is B anywhere. A click in a window with nothing to pick (the story
+ *     briefing) is A without cursor mode, which the window would otherwise
+ *     take as a grab of its scroll bar.
+ *   - While the left button is down, A is held: that is what the game's
+ *     scroll bar wants in cursor mode (menu_scroll_update scrolls while A
+ *     is held on an arrow, menu_cursor_update drags the thumb). Rows scrolled
+ *     out of a list are clipped to nothing, so without it a list could be
+ *     scrolled down by hovering its half-shown last row but never back up.
+ *   - The wheel in a list longer than its window scrolls it a step, as the
+ *     arrows do; elsewhere it steps a value row or sends left/right.
  *
  * The cursor is measured in the guest's screen units: FP draws its menus on
  * a 640x480 screen, widescreen or not (the 16:9 picture is that screen
@@ -336,6 +349,10 @@ extern void sub_000755D0(void);         /* menu_option_next */
 
 static int s_menu_cursor;               /* the mouse is driving player 1's menus */
 static uint32_t s_cursor_ours;          /* contexts whose cursor mode is ours */
+static int s_menu_pad_frame;            /* the pad took cursor mode away this frame */
+static uint32_t s_menu_focus;           /* the last item the mouse focused */
+static long s_menu_click_later;         /* a left click held over a frame */
+extern void sub_00076EF0(void);         /* menu_focus_item */
 
 static double tsfp_now(void)
 {
@@ -477,6 +494,113 @@ static int tsfp_pad_used(int player)
     return lx > 0x40 || lx < -0x40 || ly > 0x40 || ly < -0x40;
 }
 
+/* An enabled item of the window's, or 0 for none. */
+static int tsfp_menu_has_item(uint32_t w, uint32_t want)
+{
+    uint32_t it = GUEST_U32(w + TSFP_MENUWINDOW_ITEMS);
+    int n;
+
+    for (n = 0; it && n < 1024; it = GUEST_U32(it + TSFP_MENUITEM_NEXT), n++)
+        if (!(GUEST_U32(it + TSFP_MENUITEM_FLAGS) & 4) && (!want || it == want))
+            return 1;
+    return 0;
+}
+
+/* One row of a list window in its scroll units: the tallest enabled item,
+ * from screen units (menu_scroll_update keeps scroll * 0x7BA188 in +0xC0). */
+static float tsfp_menu_row(uint32_t w)
+{
+    uint32_t it = GUEST_U32(w + TSFP_MENUWINDOW_ITEMS);
+    float k = GUEST_F32(0x007BA188u), row = 0.0f, h;
+    int n;
+
+    for (n = 0; it && n < 1024; it = GUEST_U32(it + TSFP_MENUITEM_NEXT), n++) {
+        h = GUEST_F32(it + TSFP_MENUITEM_SY1) - GUEST_F32(it + TSFP_MENUITEM_SY0);
+        if (!(GUEST_U32(it + TSFP_MENUITEM_FLAGS) & 4) && h > row)
+            row = h;
+    }
+    return k > 0.0f && row > 0.0f ? row / k : GUEST_F32(w + TSFP_MENUWINDOW_SCROLL_STEP);
+}
+
+/* A list window's scroll bar, as menu_scroll_bar (0x71400) lays it out:
+ * x from the style's bar edges, y the visible area, an arrow at each end as
+ * tall as the bar is wide times 0x47839C. 0 when the list fits. */
+static int tsfp_menu_bar(uint32_t w, float r[4], float *arrow)
+{
+    uint32_t st = GUEST_U32(w + TSFP_MENUWINDOW_STYLE), o;
+    float k = GUEST_F32(0x007BA188u), view = GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y1) -
+                                             GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y0);
+
+    if (!st || !(GUEST_F32(w + TSFP_MENUWINDOW_CONTENT_HEIGHT) > view))
+        return 0;
+    o = GUEST_U32(st + 0x70) ? 0xECu : 0xE4u;
+    r[0] = GUEST_F32(st + 0x74) * GUEST_F32(0x007BA038u) + GUEST_F32(w + o);
+    r[2] = GUEST_F32(st + 0x78) * GUEST_F32(0x007BA038u) + GUEST_F32(w + o);
+    r[1] = GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y0) * k + GUEST_F32(w + 0xACu);
+    r[3] = GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y1) * k + GUEST_F32(w + 0xACu);
+    *arrow = (r[2] - r[0]) * GUEST_F32(0x0047839Cu);
+    return r[2] > r[0] && r[3] > r[1];
+}
+
+/* The arrows are drawn left of and (the lower one) above the strip the
+ * cursor update tests for them, overlapping it by a unit or two, so the
+ * pointer would have to find a sliver. Over a drawn arrow (from the right
+ * end of the rows to the bar, a little more than an arrow's height from
+ * either end) the game's cursor is put in the middle of the arrow's box. */
+static void tsfp_menu_snap_arrow(uint32_t w, float *sx, float *sy)
+{
+    float r[4], h;
+
+    if (!tsfp_menu_bar(w, r, &h) || *sx < r[0] - 1.1f * (r[2] - r[0]) || *sx >= r[2] + 4.0f)
+        return;
+    if (*sy >= r[1] - 4.0f && *sy < r[1] + 1.5f * h) {
+        *sx = (r[0] + r[2]) * 0.5f;
+        *sy = r[1] + h * 0.5f;
+    } else if (*sy >= r[3] - 2.0f * h && *sy < r[3] + 4.0f) {
+        *sx = (r[0] + r[2]) * 0.5f;
+        *sy = r[3] - h * 0.5f;
+    }
+}
+
+/* Player 1's menu window w, and the context it is in (or 32). */
+static uint32_t tsfp_menu_ctx(uint32_t w)
+{
+    uint32_t ctx = GUEST_U32(w + TSFP_MENUWINDOW_CONTEXT);
+
+    if (!(GUEST_U32(w + TSFP_MENUWINDOW_PLAYERS) & 1u) || ctx >= 32 ||
+        (GUEST_U32(w + TSFP_MENUWINDOW_FLAGS) & 0x40000u))
+        return 32;                      /* not player 1's, or keeps the pad's navigation */
+    return ctx;
+}
+
+static void tsfp_menu_cursor_off(uint32_t w, uint32_t ctx)
+{
+    uint32_t c = TSFP_G_MENU_CONTEXTS + ctx * TSFP_MENUCONTEXT_SIZE, keep = s_menu_focus;
+
+    s_menu_cursor = 0;
+    if (s_cursor_ours & (1u << ctx)) {
+        GUEST_U32(c + TSFP_MENUCONTEXT_CURSOR_MODE) = 0;
+        s_cursor_ours &= ~(1u << ctx);
+    }
+    if (!GUEST_U32(w + TSFP_MENUWINDOW_FOCUS) && keep && tsfp_menu_has_item(w, keep)) {
+        uint32_t a[2] = { w, keep };
+        tsfp_guest_call(sub_00076EF0, 2, a);
+    }
+}
+
+/* Before the menu reads its pads: a press or a pushed stick gives the menu
+ * back to the pad now, not after this frame's navigation was the cursor's. */
+static void tsfp_menu_mouse_pre(uint32_t w)
+{
+    uint32_t ctx = tsfp_menu_ctx(w);
+
+    s_menu_pad_frame = 0;
+    if (ctx < 32 && s_menu_cursor && tsfp_pad_used(0)) {
+        tsfp_menu_cursor_off(w, ctx);
+        s_menu_pad_frame = 1;
+    }
+}
+
 static void tsfp_menu_mouse(uint32_t w)
 {
     uint32_t ctx = GUEST_U32(w + TSFP_MENUWINDOW_CONTEXT), c, bit, it = 0;
@@ -502,18 +626,22 @@ static void tsfp_menu_mouse(uint32_t w)
     c = TSFP_G_MENU_CONTEXTS + ctx * TSFP_MENUCONTEXT_SIZE;
     bit = 1u << ctx;
     moved = recomp_mouse_pointer_take_moves() != 0;
-    clicks = recomp_mouse_pointer_take_clicks(&held, &wheel);
+    clicks = recomp_mouse_pointer_take_clicks(&held, &wheel) | s_menu_click_later;
+    /* A click in the frame the pointer moved waits a frame: what is under
+     * the pointer (a row, or the scroll bar over it) is the game's cursor
+     * update's to find first. */
+    s_menu_click_later = moved ? clicks & (1L << RECOMP_MOUSE_LEFT) : 0;
+    clicks &= ~s_menu_click_later;
     if (tsfp_pad_used(0))
         s_menu_cursor = 0;
-    if (moved || clicks)
+    else if ((moved || clicks || wheel) && !s_menu_pad_frame)
         s_menu_cursor = 1;
     if (!s_menu_cursor) {
-        if (s_cursor_ours & bit) {
-            GUEST_U32(c + TSFP_MENUCONTEXT_CURSOR_MODE) = 0;
-            s_cursor_ours &= ~bit;
-        }
+        tsfp_menu_cursor_off(w, ctx);
         return;
     }
+    if (GUEST_U32(w + TSFP_MENUWINDOW_FOCUS))
+        s_menu_focus = GUEST_U32(w + TSFP_MENUWINDOW_FOCUS);
     if (!GUEST_U32(c + TSFP_MENUCONTEXT_CURSOR_MODE)) {
         GUEST_U32(c + TSFP_MENUCONTEXT_CURSOR_MODE) = 1;
         s_cursor_ours |= bit;
@@ -522,6 +650,7 @@ static void tsfp_menu_mouse(uint32_t w)
     over = recomp_mouse_pointer(&px, &py);
     sx = px * TSFP_SCREEN_W;
     sy = py * TSFP_SCREEN_H;
+    tsfp_menu_snap_arrow(w, &sx, &sy);
     /* menu_cursor_place's mapping, backwards: screen = x0 + n * scale. */
     x0 = GUEST_F32(c + TSFP_MENUCONTEXT_X0);
     y0 = GUEST_F32(c + TSFP_MENUCONTEXT_Y0);
@@ -544,30 +673,54 @@ static void tsfp_menu_mouse(uint32_t w)
                     GUEST_F32(i + TSFP_MENUITEM_SX1), GUEST_F32(i + TSFP_MENUITEM_SY1),
                     GUEST_U32(i + TSFP_MENUITEM_CHOICE), GUEST_U32(i + TSFP_MENUITEM_CHOICE_COUNT));
     }
+    if (held & (1L << RECOMP_MOUSE_LEFT))
+        GUEST_U32(w + TSFP_MENUWINDOW_HELD) |= TSFP_MENU_A;
     if (clicks & (1L << RECOMP_MOUSE_LEFT)) {
-        it = over ? tsfp_menu_item_at(w, sx, sy) : 0;
-        if (it && GUEST_U32(it + TSFP_MENUITEM_KIND) == 1)
+        /* The scroll bar's arrows lie over the rows' rectangles: a click
+         * the cursor update put on a part of the bar (focus_id -2..-5) is
+         * the bar's, held A scrolls, and no row is picked. */
+        int bar = (int)GUEST_U32(w + TSFP_MENUWINDOW_FOCUS_ID) <= -2;
+        it = over && !bar ? tsfp_menu_item_at(w, sx, sy) : 0;
+        if (bar)
+            ;
+        else if (it && GUEST_U32(it + TSFP_MENUITEM_KIND) == 1)
             tsfp_menu_step_value(it, sx);
         else if (it)
             GUEST_U32(w + TSFP_MENUWINDOW_PRESSED) |= TSFP_MENU_A;
+        else if (over && !tsfp_menu_has_item(w, 0)) {
+            tsfp_menu_cursor_off(w, ctx);
+            GUEST_U32(w + TSFP_MENUWINDOW_PRESSED) |= TSFP_MENU_A;
+        }
     }
     if (clicks & (1L << RECOMP_MOUSE_RIGHT))
         GUEST_U32(w + TSFP_MENUWINDOW_PRESSED) |= TSFP_MENU_B;
+    /* The wheel in a list longer than its window scrolls it by the arrows'
+     * step (up is towards the top), from wherever it is easing to. */
+    if (wheel && over && GUEST_F32(w + TSFP_MENUWINDOW_CONTENT_HEIGHT) >
+            GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y1) - GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y0)) {
+        float most = GUEST_F32(w + TSFP_MENUWINDOW_CONTENT_HEIGHT) -
+                     (GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y1) - GUEST_F32(w + TSFP_MENUWINDOW_VIEW_Y0));
+        float to = GUEST_F32(w + TSFP_MENUWINDOW_SCROLL_TARGET) - (float)wheel * tsfp_menu_row(w);
+        GUEST_F32(w + TSFP_MENUWINDOW_SCROLL_TARGET) = to < 0.0f ? 0.0f : to > most ? most : to;
+    }
     /* The wheel over a row: a value row steps its value (up forward), any
      * other gets left/right as from the pad, which is how sliders move. */
-    if (wheel && over && (it = tsfp_menu_item_at(w, sx, sy)) != 0) {
+    else if (wheel && over && (it = tsfp_menu_item_at(w, sx, sy)) != 0) {
         if (GUEST_U32(it + TSFP_MENUITEM_KIND) == 1)
             tsfp_guest_call(wheel > 0 ? sub_000755D0 : sub_000756A0, 1, &it);
         else
             GUEST_U32(w + TSFP_MENUWINDOW_PRESSED) |= wheel > 0 ? TSFP_MENU_RIGHT : TSFP_MENU_LEFT;
     }
-    if (s_menu_trace && (moved || clicks))
+    if (s_menu_trace && (moved || clicks || wheel))
         fprintf(stderr, "[MENU] window 0x%08X ctx %u rect %.1f,%.1f-%.1f,%.1f bounds %.1f,%.1f-%.1f,%.1f "
-                "pointer %.3f,%.3f%s -> %.1f,%.1f clicks 0x%lX item 0x%08X kind %d focus 0x%08X\n",
+                "pointer %.3f,%.3f%s -> %.1f,%.1f clicks 0x%lX wheel %d scroll %.1f->%.1f part %d "
+                "item 0x%08X kind %d focus 0x%08X\n",
                 w, ctx, x0, y0, GUEST_F32(c + TSFP_MENUCONTEXT_X1), GUEST_F32(c + TSFP_MENUCONTEXT_Y1),
                 GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MIN_X), GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MIN_Y),
                 GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MAX_X), GUEST_F32(c + TSFP_MENUCONTEXT_CURSOR_MAX_Y),
-                px, py, over ? "" : " (off)", sx, sy, clicks, it,
+                px, py, over ? "" : " (off)", sx, sy, clicks, wheel,
+                GUEST_F32(w + TSFP_MENUWINDOW_SCROLL), GUEST_F32(w + TSFP_MENUWINDOW_SCROLL_TARGET),
+                (int)GUEST_U32(w + TSFP_MENUWINDOW_FOCUS_ID), it,
                 it ? (int)GUEST_U32(it + TSFP_MENUITEM_KIND) : -1,
                 GUEST_U32(w + TSFP_MENUWINDOW_FOCUS));
 }
@@ -576,6 +729,8 @@ void sub_00073870(void)
 {
     uint32_t w = GUEST_U32(g_esp + 4);  /* (MenuWindow *) */
 
+    if (w)
+        tsfp_menu_mouse_pre(w);
     sub_00073870_gen();
     if (w)
         tsfp_menu_mouse(w);

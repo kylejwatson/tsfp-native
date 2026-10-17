@@ -357,6 +357,13 @@
    "source": "menu mouse study (2026-10-14)"
   },
   {
+   "addr": "0x00076EF0",
+   "name": "menu_focus_item",
+   "sig": "void menu_focus_item(MenuWindow *w, MenuItem *it)",
+   "notes": "Gives an item the focus (+0x198, its id in +0x18C, row in +0x184) and scrolls the list to it; a null item clears the focus. menu_cursor_update calls it with the item under the cursor, so a cursor over nothing leaves no focus.",
+   "source": "decompiled 2026-10-17 (menu_focus_id tail-calls it)"
+  },
+  {
    "addr": "0x00077110",
    "name": "menu_focus_id",
    "sig": "void menu_focus_id(MenuWindow *w, int id)",
@@ -2966,6 +2973,42 @@
      "notes": "0x40000: ignores cursor mode"
     },
     {
+     "off": "0x5C",
+     "name": "content_height",
+     "type": "float",
+     "notes": "height of everything in a list window (menu_scroll_update: max scroll = content_height - (view_y1 - view_y0))"
+    },
+    {
+     "off": "0x6C",
+     "name": "view_y0",
+     "type": "float",
+     "notes": "top of the list's visible area"
+    },
+    {
+     "off": "0x70",
+     "name": "view_y1",
+     "type": "float",
+     "notes": "bottom of the list's visible area"
+    },
+    {
+     "off": "0x84",
+     "name": "scroll",
+     "type": "float",
+     "notes": "current scroll offset of a list window"
+    },
+    {
+     "off": "0x88",
+     "name": "scroll_target",
+     "type": "float",
+     "notes": "scroll offset being eased to; menu_scroll_update only steps when it equals scroll"
+    },
+    {
+     "off": "0x98",
+     "name": "scroll_step",
+     "type": "float",
+     "notes": "one step of the scroll arrows / held up-down"
+    },
+    {
      "off": "0xC4",
      "name": "pressed",
      "type": "uint",
@@ -2986,6 +3029,18 @@
      "off": "0x178",
      "name": "items",
      "type": "MenuItem *"
+    },
+    {
+     "off": "0x18C",
+     "name": "focus_id",
+     "type": "int",
+     "notes": "focused item's id (+0x14), or a scroll-bar part under the cursor: -2 thumb, -3 up arrow, -4 down arrow, -5 window"
+    },
+    {
+     "off": "0x194",
+     "name": "cursor_grab",
+     "type": "int",
+     "notes": "scroll-bar part held with A in cursor mode, -1 none"
     },
     {
      "off": "0x198",

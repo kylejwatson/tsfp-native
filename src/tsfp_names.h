@@ -62,6 +62,7 @@
 #define TSFP_FN_MENU_OPTION_PREV                 0x000756A0u
 #define TSFP_FN_MENU_BEGIN_WINDOW                0x00075B70u
 #define TSFP_FN_MENU_DRAW_WINDOW                 0x00076810u
+#define TSFP_FN_MENU_FOCUS_ITEM                  0x00076EF0u
 #define TSFP_FN_MENU_FOCUS_ID                    0x00077110u
 #define TSFP_FN_MENU_CURSOR_TO_FOCUS             0x00077720u
 #define TSFP_FN_MENU_CURSOR_UPDATE               0x000777E0u
@@ -557,10 +558,18 @@
 #define TSFP_MENUWINDOW_CONTEXT                  0x38u  /* int */
 #define TSFP_MENUWINDOW_PLAYERS                  0x3Cu  /* uint */
 #define TSFP_MENUWINDOW_FLAGS                    0x40u  /* uint */
+#define TSFP_MENUWINDOW_CONTENT_HEIGHT           0x5Cu  /* float */
+#define TSFP_MENUWINDOW_VIEW_Y0                  0x6Cu  /* float */
+#define TSFP_MENUWINDOW_VIEW_Y1                  0x70u  /* float */
+#define TSFP_MENUWINDOW_SCROLL                   0x84u  /* float */
+#define TSFP_MENUWINDOW_SCROLL_TARGET            0x88u  /* float */
+#define TSFP_MENUWINDOW_SCROLL_STEP              0x98u  /* float */
 #define TSFP_MENUWINDOW_PRESSED                  0xC4u  /* uint */
 #define TSFP_MENUWINDOW_HELD                     0xC8u  /* uint */
 #define TSFP_MENUWINDOW_CHILDREN                 0x16Cu  /* MenuWindow * */
 #define TSFP_MENUWINDOW_ITEMS                    0x178u  /* MenuItem * */
+#define TSFP_MENUWINDOW_FOCUS_ID                 0x18Cu  /* int */
+#define TSFP_MENUWINDOW_CURSOR_GRAB              0x194u  /* int */
 #define TSFP_MENUWINDOW_FOCUS                    0x198u  /* MenuItem * */
 #define TSFP_MENUWINDOW_ON_ACCEPT                0x1BCu  /* void * */
 #define TSFP_MENUWINDOW_ON_BACK                  0x1C0u  /* void * */
