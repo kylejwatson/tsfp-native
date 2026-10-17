@@ -9,7 +9,8 @@
 # the game module from their own disc with the kit's Python and Zig.
 #
 # Ubuntu 22.04 for its older glibc: the executable runs on any distribution
-# with at least the glibc it was linked against (printed below).
+# with at least the glibc it was linked against (printed below; 2.34 when
+# tried in a 22.04 container).
 
 name: dist
 
@@ -19,6 +20,10 @@ on:
 
 permissions:
   contents: read
+
+env:
+  VKSDK_VERSION: 1.4.363.0
+  VKSDK_SHA256: 197962f5cbf80baf2775a03336a01cee7c8745686c65aaa70d3f751ade4d7e43
 
 concurrency:
   group: dist-${{ github.ref }}
@@ -38,7 +43,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             clang ninja-build pkg-config libsdl2-dev libssl-dev libvulkan-dev \
-            libshaderc-dev glslc libfreetype-dev libfontconfig-dev
+            libfreetype-dev libfontconfig-dev
+
+      # Ubuntu 22.04 has no shaderc package: take it from the LunarG Vulkan
+      # SDK (built for 22.04), pinned and checked. make_kit.sh bundles its
+      # libshaderc_shared.so.1 (glslang and SPIRV-Tools are inside it).
+      - name: Cache the Vulkan SDK
+        id: vksdk
+        uses: actions/cache@v4
+        with:
+          path: ~/vksdk
+          key: vksdk-${{ env.VKSDK_VERSION }}
+
+      - name: Fetch the Vulkan SDK
+        if: steps.vksdk.outputs.cache-hit != 'true'
+        run: |
+          f=vulkansdk-linux-x86_64-$VKSDK_VERSION.tar.xz
+          curl -sSfL -o "/tmp/$f" "https://sdk.lunarg.com/sdk/download/$VKSDK_VERSION/linux/$f"
+          echo "$VKSDK_SHA256  /tmp/$f" | sha256sum -c
+          mkdir -p ~/vksdk
+          tar xJf "/tmp/$f" -C ~/vksdk --strip-components=1 "$VKSDK_VERSION/x86_64"
+
+      - name: Use the SDK's shaderc
+        run: |
+          echo "PKG_CONFIG_PATH=$HOME/vksdk/x86_64/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$HOME/vksdk/x86_64/lib" >> "$GITHUB_ENV"
 
       - name: No game files in the checkout
         run: |
